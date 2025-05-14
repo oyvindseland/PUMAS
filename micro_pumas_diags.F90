@@ -46,7 +46,7 @@ use pumas_kinds,   only: r8=>kind_r8
     real(r8), allocatable :: qirestot(:,:)
     real(r8), allocatable :: mnuccrtot(:,:)
     real(r8), allocatable :: mnudeptot(:,:)
-    real(r8), allocatable :: mnuccritot(:,:)
+    real(r8), allocatable :: mnuccritot(:,:) ! mixing ratio tendency due to heterogeneous freezing of rain to snow (1/s)
     real(r8), allocatable :: pracstot(:,:)
     real(r8), allocatable :: meltsdttot(:,:)
     real(r8), allocatable :: frzrdttot(:,:)
@@ -136,6 +136,26 @@ use pumas_kinds,   only: r8=>kind_r8
   real(r8), allocatable :: NC_fixer(:,:)     !Emulated: change in cloud number number due to ML fixer
   real(r8), allocatable :: QR_fixer(:,:)     !Emulated: change in rain mass due to ML fixer
   real(r8), allocatable :: NR_fixer(:,:)     !Emulated: change in rain number due to ML fixer
+! RaFSIP GS/PG
+  real(r8), allocatable :: nsubctot(:,:)    ! evaporation of droplet
+  real(r8), allocatable :: nprc1tot(:,:)    ! autoconversion
+  real(r8), allocatable :: ncsedtentot(:,:) ! nqc sedimentation tendency
+  real(r8), allocatable :: nisedtentot(:,:) ! nqi sedimentation tendency
+  real(r8), allocatable :: nimelttot(:,:)   ! ni melting of cloud ice
+  real(r8), allocatable :: nihomotot(:,:)   ! ni homogeneos freezign cloud water
+  real(r8), allocatable :: nsubitot(:,:)    ! evaporation of cloud ice number (sublimation?)
+  real(r8), allocatable :: npccntot(:,:)    ! droplet activation
+!
+  real(r8), allocatable :: nctnszmx(:,:)  ! nc tuning: maximum slope (reduction of number)
+  real(r8), allocatable :: nctnszmn(:,:)  ! nc tuning: minimum slope (increase of numer)
+  real(r8), allocatable :: nctnncld(:,:)  ! nc tuning: removal of nc when qc is zero after mg
+  real(r8), allocatable :: nitncons(:,:)  ! ni tuning to conserve numberi in substeps
+  real(r8), allocatable :: nitnszmx(:,:)  ! ni tuning: maximum slope
+  real(r8), allocatable :: nitnszmn(:,:)  ! ni tuning: minimum minimum slope
+  real(r8), allocatable :: nitnncld(:,:)  ! ni tuning: removal of ni when qi is zero after mg
+  real(r8), allocatable :: frzr(:,:)! mixing ratio tendency due to heterogeneous freezing of rain to ice (1/s)
+  real(r8), allocatable :: nfrzr(:,:)! ni tendency due to heterogeneous freezing of rain to ice (1/s)
+! RaFSIP GS/PG
 
     contains
       procedure :: allocate => proc_rates_allocate
@@ -144,7 +164,7 @@ use pumas_kinds,   only: r8=>kind_r8
 
 contains
 
-   subroutine proc_rates_allocate(this, psetcols, nlev, ncd, warm_rain, errstring)
+   subroutine proc_rates_allocate(this, psetcols, nlev, ncd, warm_rain, rafsip_on, errstring)
    !--------------------------------------------------------------
    ! Routine to allocate the elements of the proc_rates DDT
    !--------------------------------------------------------------
@@ -153,10 +173,11 @@ contains
 
       class(proc_rates_type) :: this
 
-      integer,           intent(in) :: psetcols, nlev
-      integer,           intent(in) :: ncd
-      character(len=16), intent(in) :: warm_rain            ! 'tau','emulated','sb2001' or 'kk2000'
-      character(128),   intent(out) :: errstring
+      integer,           intent(in)  :: psetcols, nlev
+      integer,           intent(in)  :: ncd
+      character(len=16), intent(in)  :: warm_rain            ! 'tau','emulated','sb2001' or 'kk2000'
+      logical,           intent(in)  :: rafsip_on
+      character(128),    intent(out) :: errstring
 
       integer :: ierr
 
@@ -648,15 +669,89 @@ contains
         errstring='Error allocating this%nrtend_KK2000'
       end if
 
+! RaFSIP GS/PG
+      if (rafsip_on) then
+         allocate(this%nsubctot(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nsubctot'
+         end if
+         allocate(this%nprc1tot(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nprc1tot'
+         end if
+         allocate(this%ncsedtentot(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%ncsedtentot'
+         end if
+         allocate(this%nisedtentot(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nisedtentot'
+         end if
+         allocate(this%nimelttot(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nimelttot'
+         end if
+         allocate(this%nihomotot(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nihomotot'
+         end if
+         allocate(this%nsubitot(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nsubitot'
+         end if
+         allocate(this%npccntot(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%npccntot'
+         end if
+         allocate(this%nctnszmx(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nctnszmx'
+         end if
+         allocate(this%nctnszmn(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nctnszmn'
+         end if
+         allocate(this%nctnncld(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nctnncld'
+         end if
+         allocate(this%nitncons(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nitncons'
+         end if
+         allocate(this%nitnszmx(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nitnszmx'
+         end if
+         allocate(this%nitnszmn(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nitnszmn'
+         end if
+         allocate(this%nitnncld(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nitnncld'
+         end if
+         allocate(this%frzr(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%frzr'
+         end if
+         allocate(this%nfrzr(psetcols,nlev), stat=ierr)
+         if (ierr /= 0) then
+            errstring='Error allocating this%nfrzr'
+         end if
+      end if
+! RaFSIP GS/PG
+
    end subroutine proc_rates_allocate
 
-   subroutine proc_rates_deallocate(this, warm_rain)
+   subroutine proc_rates_deallocate(this, warm_rain, rafsip_on)
    !--------------------------------------------------------------
    ! Routine to deallocate the elements of the proc_rates DDT
    !--------------------------------------------------------------
 
       class(proc_rates_type) :: this
       character(len=16), intent(in) :: warm_rain            ! 'tau','emulated','sb2001' or 'kk2000'
+      logical,           intent(in) :: rafsip_on
 
       deallocate(this%prodsnow)
       deallocate(this%evapsnow)
@@ -717,6 +812,7 @@ contains
       deallocate(this%nnuccdtot)
       deallocate(this%nnudeptot)
       deallocate(this%nhomotot)
+
       deallocate(this%nnuccrtot)
       deallocate(this%nnuccritot)
       deallocate(this%nsacwitot)
@@ -783,6 +879,28 @@ contains
          deallocate(this%qrtend_SB2001)
          deallocate(this%nrtend_SB2001)
       end if
+
+! RaFSIP GS/PG
+      if (rafsip_on) then
+         deallocate(this%nsubctot)
+         deallocate(this%nprc1tot)
+         deallocate(this%ncsedtentot)
+         deallocate(this%nisedtentot)
+         deallocate(this%nimelttot)
+         deallocate(this%nihomotot)
+         deallocate(this%nsubitot)
+         deallocate(this%npccntot)
+         deallocate(this%nctnszmx)
+         deallocate(this%nctnszmn)
+         deallocate(this%nctnncld)
+         deallocate(this%nitncons)
+         deallocate(this%nitnszmx)
+         deallocate(this%nitnszmn)
+         deallocate(this%nitnncld)
+         deallocate(this%frzr)
+         deallocate(this%nfrzr)
+      end if
+! RaFSIP GS/PG
 
    end subroutine proc_rates_deallocate
 
