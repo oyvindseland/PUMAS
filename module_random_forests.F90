@@ -69,7 +69,8 @@ module module_random_forests
    INTEGER, DIMENSION(JBT), PUBLIC, PROTECTED :: NRNODES1,NRNODES2,NRNODES3,NRNODES4,NRNODES5
 
    !! Namelist variables
-   logical, public, protected :: rafsip_on = .false.
+   logical, public, protected          :: rafsip_on = .false.
+   character(len=4), public, protected :: rafsip_diags = 'None'
 
    character(len=256) :: forestfileALL = 'NONE'
    character(len=256) :: forestfileBRDS = 'NONE'
@@ -99,7 +100,7 @@ CONTAINS
       integer                     :: unitn, ierr
       character(len=*), parameter :: subname = 'sec_ice_readnl'
 
-      namelist /sec_ice_nl/ rafsip_on,                                        &
+      namelist /sec_ice_nl/ rafsip_on, rafsip_diags,                          &
            forestfileALL,                                                     &
            forestfileBRDS,                                                    &
            forestfileBRHM,                                                    &
@@ -108,6 +109,7 @@ CONTAINS
 
       ! Initialize all namelist variables
       rafsip_on = .false.
+      rafsip_diags = 'None'
       forestfileALL = 'None'
       forestfileBRDS = 'None'
       forestfileBRHM = 'None'
@@ -138,6 +140,13 @@ CONTAINS
            mstrid, mpicom, ierr)
       call MPI_Bcast(forestfileBRwarm,len(forestfileBRwarm), mpi_character,   &
            mstrid, mpicom, ierr)
+      call MPI_Bcast(rafsip_diags,    len(rafsip_diags),     mpi_character,   &
+           mstrid, mpicom, ierr)
+
+      if (.not. rafsip_on) then
+         ! Do not allow SIP diagnostics if they are not computed
+         rafsip_diags = 'None'
+      end if
 
       if (masterproc) then
          write(iulog ,*) 'Microphysics secondary ice namelist:'
@@ -148,6 +157,7 @@ CONTAINS
             write(iulog, *) '  forestfileBRHM   = ', trim(forestfileBRHM)
             write(iulog, *) '  forestfileBR     = ', trim(forestfileBR)
             write(iulog, *) '  forestfileBRwarm = ', trim(forestfileBRwarm)
+            write(iulog, *) '  rafsip_diags = ',     trim(rafsip_diags)
          end if
       end if
 

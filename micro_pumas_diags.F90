@@ -155,6 +155,15 @@ use pumas_kinds,   only: r8=>kind_r8
   real(r8), allocatable :: nitnncld(:,:)  ! ni tuning: removal of ni when qi is zero after mg
   real(r8), allocatable :: frzr(:,:)! mixing ratio tendency due to heterogeneous freezing of rain to ice (1/s)
   real(r8), allocatable :: nfrzr(:,:)! ni tendency due to heterogeneous freezing of rain to ice (1/s)
+  real(r8), allocatable :: BR_RATE(:,:) ! SIP RATE DUE TO COLLISIONAL BREAK-UP
+  real(r8), allocatable :: DS_RATE(:,:) ! SIP RATE DUE TO DROPLET-SHATTERING
+  real(r8), allocatable :: HM_RATE(:,:) ! SIP RATE DUE TO HALLETT-MOSSOP
+  real(r8), allocatable :: SIP_RATE(:,:) ! TOTAL SIP rate predicted by the RaFSIP (kg-1 s-1)
+  real(r8), allocatable :: IWC(:,:)     ! TOTAL ICE WATER CONTENT IN KG/KG INPUT TO RaFSIP
+  real(r8), allocatable :: RIMC(:,:)    ! TOTAL CLOUD DROPLET RIMING IN KG/KG/S INPUT TO RaFSIP
+  real(r8), allocatable :: RIMR(:,:)    ! TOTAL RAINDROP RIMING IN KG/KG/S INPUT TO RaFSIP
+  real(r8), allocatable :: RHI(:,:)     ! RELATIVE HUMIDITY WRT ICE INPUT TO RaFSIP
+  real(r8), allocatable :: LWC(:,:)     ! TOTAL LIQUID WATER CONTENT IN KG/KG INPUT TO RaFSIP
 ! RaFSIP GS/PG
 
     contains
@@ -164,7 +173,7 @@ use pumas_kinds,   only: r8=>kind_r8
 
 contains
 
-   subroutine proc_rates_allocate(this, psetcols, nlev, ncd, warm_rain, rafsip_on, errstring)
+   subroutine proc_rates_allocate(this, psetcols, nlev, ncd, warm_rain, rafsip_on, rafsip_diags, errstring)
    !--------------------------------------------------------------
    ! Routine to allocate the elements of the proc_rates DDT
    !--------------------------------------------------------------
@@ -177,6 +186,7 @@ contains
       integer,           intent(in)  :: ncd
       character(len=16), intent(in)  :: warm_rain            ! 'tau','emulated','sb2001' or 'kk2000'
       logical,           intent(in)  :: rafsip_on
+      character(len=*),  intent(in)  :: rafsip_diags
       character(128),    intent(out) :: errstring
 
       integer :: ierr
@@ -739,6 +749,46 @@ contains
          if (ierr /= 0) then
             errstring='Error allocating this%nfrzr'
          end if
+         if (trim(rafsip_diags) /= 'None') then
+            allocate(this%BR_RATE(psetcols,nlev), stat=ierr)
+            if (ierr /= 0) then
+               errstring='Error allocating this%BR_RATE'
+            end if
+            allocate(this%DS_RATE(psetcols,nlev), stat=ierr)
+            if (ierr /= 0) then
+               errstring='Error allocating this%DS_RATE'
+            end if
+            allocate(this%HM_RATE(psetcols,nlev), stat=ierr)
+            if (ierr /= 0) then
+               errstring='Error allocating this%HM_RATE'
+            end if
+            allocate(this%SIP_RATE(psetcols,nlev), stat=ierr)
+            if (ierr /= 0) then
+               errstring='Error allocating this%SIP_RATE'
+            end if
+         end if
+         if (trim(rafsip_diags) == 'All') then
+            allocate(this%IWC(psetcols,nlev), stat=ierr)
+            if (ierr /= 0) then
+               errstring='Error allocating this%IWC'
+            end if
+            allocate(this%RIMC(psetcols,nlev), stat=ierr)
+            if (ierr /= 0) then
+               errstring='Error allocating this%RIMC'
+            end if
+            allocate(this%RIMR(psetcols,nlev), stat=ierr)
+            if (ierr /= 0) then
+               errstring='Error allocating this%RIMR'
+            end if
+            allocate(this%RHI(psetcols,nlev), stat=ierr)
+            if (ierr /= 0) then
+               errstring='Error allocating this%RHI'
+            end if
+            allocate(this%LWC(psetcols,nlev), stat=ierr)
+            if (ierr /= 0) then
+               errstring='Error allocating this%LWC'
+            end if
+         end if
       end if
 ! RaFSIP GS/PG
 
@@ -812,7 +862,6 @@ contains
       deallocate(this%nnuccdtot)
       deallocate(this%nnudeptot)
       deallocate(this%nhomotot)
-
       deallocate(this%nnuccrtot)
       deallocate(this%nnuccritot)
       deallocate(this%nsacwitot)
@@ -899,6 +948,33 @@ contains
          deallocate(this%nitnncld)
          deallocate(this%frzr)
          deallocate(this%nfrzr)
+         if (allocated(this%BR_RATE)) then
+            deallocate(this%BR_RATE)
+         end if
+         if (allocated(this%DS_RATE)) then
+            deallocate(this%DS_RATE)
+         end if
+         if (allocated(this%HM_RATE)) then
+            deallocate(this%HM_RATE)
+         end if
+         if (allocated(this%SIP_RATE)) then
+            deallocate(this%SIP_RATE)
+         end if
+         if (allocated(this%IWC)) then
+            deallocate(this%IWC)
+         end if
+         if (allocated(this%RIMC)) then
+            deallocate(this%RIMC)
+         end if
+         if (allocated(this%RIMR)) then
+            deallocate(this%RIMR)
+         end if
+         if (allocated(this%RHI)) then
+            deallocate(this%RHI)
+         end if
+         if (allocated(this%LWC)) then
+            deallocate(this%LWC)
+         end if
       end if
 ! RaFSIP GS/PG
 

@@ -128,7 +128,7 @@ use micro_pumas_utils, only: &
      VLENS
 
 ! RaFSIP GS/PG
-use module_random_forests, only: rafsip_on, jbt
+use module_random_forests, only: rafsip_on, rafsip_diags, jbt
 use module_random_forests, only: max_nodes1, leftchild1, rightchild1, splitfeat1
 use module_random_forests, only: thresh1, out11, out12, out13
 use module_random_forests, only: max_nodes2, leftchild2, rightchild2, splitfeat2
@@ -1032,7 +1032,9 @@ subroutine micro_pumas_tend (                                            &
 
   ! relative humidity
   real(r8) :: relhum(mgncol,nlev)
+  ! RaFSIP GS/PG
   real(r8) :: relhumi(mgncol,nlev)
+  ! RaFSIP GS/PG
 
   ! parameters for cloud water and cloud ice sedimentation calculations
   real(r8) :: fc(mgncol,nlev)
@@ -1048,8 +1050,8 @@ subroutine micro_pumas_tend (                                            &
 
   real(r8) :: rthrsh     ! rain rate threshold for reflectivity calculation
 
-  ! RaFSIP additional parameters ! GS/PG
-  !Inputs to SIP parameterization
+  ! RaFSIP GS/PG, additional parameters
+  ! Inputs to SIP parameterization
   real(r8) ::  IWC(mgncol,nlev)      ! TOTAL ICE WATER CONTENT IN KG/KG INPUT TO RaFSIP
   real(r8) ::  RIMC(mgncol,nlev)     ! TOTAL CLOUD DROPLET RIMING IN KG/KG/S INPUT TO RaFSIP
   real(r8) ::  RIMR(mgncol,nlev)     ! TOTAL RAINDROP RIMING IN KG/KG/S INPUT TO RaFSIP
@@ -1150,12 +1152,6 @@ subroutine micro_pumas_tend (                                            &
   ! RaFSIP GS/PG
   ! Dummy variables used to define the inputs/features and outputs/targets
   !    of the RaFSIP parameterization !GS/PG
-  real(r8) :: IWCRF1,RIMCRF1,TEMPRF1,RHIRF1,RIMRRF1,LWCRF1
-  real(r8) :: IWCRF2, RIMCRF2, TEMPRF2, RHIRF2, LWCRF2
-  real(r8) :: IWCRF3,RIMCRF3,TEMPRF3,RHIRF3,RIMRRF3,LWCRF3
-  real(r8) :: IWCRF4, RIMCRF4, TEMPRF4, RHIRF4, LWCRF4
-  real(r8) :: IWCRF5, RIMCRF5, TEMPRF5, RHIRF5, LWCRF5
-  real(r8) :: FEATURES5(MDIM5),FEATURES6(MDIM6)
   real(r8) :: YPRED1,YPRED2,YPRED3,YPRED4,YPRED5
   real(r8) :: nimax
   ! RaFSIP GS/PG
@@ -1278,7 +1274,11 @@ subroutine micro_pumas_tend (                                            &
   !$acc               proc_rates%nctnncld, proc_rates%nitncons,               &
   !$acc               proc_rates%nitnszmx, proc_rates%nitnszmn,               &
   !$acc               proc_rates%nitnncld, proc_rates%frzr,                   &
-  !$acc               proc_rates%nfrzr)                                       &
+  !$acc               proc_rates%nfrzr,                                       &
+  !$acc               proc_rates%BR_RATE, proc_rates%DS_RATE,                 &
+  !$acc               proc_rates%HM_RATE, proc_rates%SIP_RATE,                &
+  !$acc               proc_rates%IWC, proc_rates%RIMC, proc_rates%RIMR,       &
+  !$acc               proc_rates%RHI, proc_rates%LWC)                         &
   !$acc      create  (qc,qi,nc,ni,qr,qs,nr,ns,qg,ng,rho,dv,mu,sc,rhof,        &
   !$acc               precip_frac,cldm,icldm,lcldm,qsfm,qcic,qiic,qsic,qric,  &
   !$acc               qgic,ncic,niic,nsic,nric,ngic,lami,n0i,lamc,pgam,lams,  &
@@ -1299,15 +1299,10 @@ subroutine micro_pumas_tend (                                            &
   !$acc               rnstep_r,nstep_s,rnstep_s,nstep_g,rnstep_g,prect_i,     &
   !$acc               tlat_i,qvlat_i,preci_i,prect_l,tlat_l,qvlat_l,prect_r,  &
   !$acc               prect_s,preci_s,prect_g,preci_g,                        &
-  !$acc               relhumi, IWCRF1,RIMCRF1,TEMPRF1,RHIRF1,RIMRRF1,LWCRF1,  &
-  !$acc               IWCRF2, RIMCRF2, TEMPRF2, RHIRF2, LWCRF2,               &
-  !$acc               IWCRF3,RIMCRF3,TEMPRF3,RHIRF3,RIMRRF3,LWCRF3,           &
-  !$acc               IWCRF4, RIMCRF4, TEMPRF4, RHIRF4, LWCRF4,               &
-  !$acc               IWCRF5, RIMCRF5, TEMPRF5, RHIRF5, LWCRF5,               &
-  !$acc               FEATURES5, FEATURES6,                                   &
+  !$acc               relhumi, nimax,                                         &
   !$acc               YPRED1,YPRED2,YPRED3,YPRED4,YPRED5, nimax,              &
   !$acc               IWC, RIMC, RIMR, TEMPK, RHI, LWC,                       &
-  !$acc               BR_RATE, DS_RATE, HM_RATE, SIP_RATE, QIRSIP, QICSIP,    &
+  !$acc               BR_RATE, DS_RATE, HM_RATE, SIP_RATE, QIRSIP, QICSIP     &
   !$acc               )
 
   ! Copies of input concentrations that may be changed internally.
@@ -1443,7 +1438,7 @@ subroutine micro_pumas_tend (                                            &
         relhum(i,k) = q(i,k) / max(qvl(i,k), qsmall)
   ! RaFSIP GS/PG
         if (rafsip_on) then
-           relhumi = q(i,k) / max(qvi(i,k), qsmall)
+           relhumi(i,k) = q(i,k) / max(qvi(i,k), qsmall)
         end if
   ! RaFSIP GS/PG
 
@@ -1557,6 +1552,7 @@ subroutine micro_pumas_tend (                                            &
         lami(i,k)               = 0._r8
         n0s(i,k)                = 0._r8
         lams(i,k)               = 0._r8
+        ninstsm(i,k)            = 0._r8
         ninstgm(i,k)            = 0._r8
         psacws(i,k)             = 0._r8
         pracs(i,k)              = 0._r8
@@ -1665,7 +1661,6 @@ subroutine micro_pumas_tend (                                            &
 
 ! RaFSIP GS/PG
   ! initialize RaFSIP variables
-
   if (rafsip_on) then
      !$acc parallel vector_length(VLENS) default(present)
      !$acc loop gang vector collapse(2)
@@ -1688,42 +1683,28 @@ subroutine micro_pumas_tend (                                            &
            proc_rates%nitnncld(i,k)    = 0.0_r8
            proc_rates%frzr(i,k)        = 0.0_r8
            proc_rates%nfrzr(i,k)       = 0.0_r8
+           if (trim(rafsip_diags) /= 'None') then
+              proc_rates%BR_RATE(i,k)     = 0.0_r8
+              proc_rates%DS_RATE(i,k)     = 0.0_r8
+              proc_rates%HM_RATE(i,k)     = 0.0_r8
+              proc_rates%SIP_RATE(i,k)    = 0.0_r8
+           end if
+           if (trim(rafsip_diags) == 'All') then
+              proc_rates%IWC(i,k)         = 0.0_r8
+              proc_rates%RIMC(i,k)        = 0.0_r8
+              proc_rates%RIMR(i,k)        = 0.0_r8
+              proc_rates%RHI(i,k)         = 0.0_r8
+              proc_rates%LWC(i,k)         = 0.0_r8
+           end if
         end do
      end do
      !$acc end parallel
   end if
+! RaFSIP GS/PG
 
+! RaFSIP GS/PG
   ! Dummy variables used to define the inputs/features and outputs/targets
   !    of the RaFSIP parameterization !GS/PG
-  IWCRF1       = 0.0_r8
-  RIMCRF1      = 0.0_r8
-  TEMPRF1      = 0.0_r8
-  RHIRF1       = 0.0_r8
-  RIMRRF1      = 0.0_r8
-  LWCRF1       = 0.0_r8
-  IWCRF2       = 0.0_r8
-  RIMCRF2      = 0.0_r8
-  TEMPRF2      = 0.0_r8
-  RHIRF2       = 0.0_r8
-  LWCRF2       = 0.0_r8
-  IWCRF3       = 0.0_r8
-  RIMCRF3      = 0.0_r8
-  TEMPRF3      = 0.0_r8
-  RHIRF3       = 0.0_r8
-  RIMRRF3      = 0.0_r8
-  LWCRF3       = 0.0_r8
-  IWCRF4       = 0.0_r8
-  RIMCRF4      = 0.0_r8
-  TEMPRF4      = 0.0_r8
-  RHIRF4       = 0.0_r8
-  LWCRF4       = 0.0_r8
-  IWCRF5       = 0.0_r8
-  RIMCRF5      = 0.0_r8
-  TEMPRF5      = 0.0_r8
-  RHIRF5       = 0.0_r8
-  LWCRF5       = 0.0_r8
-  FEATURES5(:) = 0.0_r8
-  FEATURES6(:) = 0.0_r8
   YPRED1       = 0.0_r8
   YPRED2       = 0.0_r8
   YPRED3       = 0.0_r8
@@ -2716,11 +2697,19 @@ subroutine micro_pumas_tend (                                            &
      !$acc end parallel
 
 ! RaFSIP GS/PG
+     ! Compute secondary ice production
      if (rafsip_on) then
         !$acc parallel vector_length(VLENS) default(present)
         !$acc loop gang vector collapse(2)
         do k=1, nlev
            do i = 1, mgncol
+              !! Initialize all variables to zero
+              BR_RATE(i,k) = 0._r8
+              DS_RATE(i,k) = 0._r8
+              HM_RATE(i,k) = 0._r8
+              SIP_RATE(i,k) = 0._r8
+              QIRSIP(i,k) = 0._r8
+              QICSIP(i,k) = 0._r8
               !! First we define all the useful parameters
               !! that will be used as inputs to the parameterization
               ! The total ice water content in kg/kg
@@ -2736,6 +2725,14 @@ subroutine micro_pumas_tend (                                            &
               ! The total liquid water content in kg/kg
               LWC(i,k) = qcic(i,k)+qric(i,k)
 
+              if (trim(rafsip_diags) == 'All') then
+                 ! Save parameters as diagnostics
+                 proc_rates%IWC(i,k)  = IWC(i,k)
+                 proc_rates%RIMC(i,k) = RIMC(i,k)
+                 proc_rates%RIMR(i,k) = RIMR(i,k)
+                 proc_rates%RHI(i,k)  = RHI(i,k)
+                 proc_rates%LWC(i,k)  = LWC(i,k)
+              end if
 
               ! Lower bounds
               if ((RIMC(i,k) > 0._r8) .and. (IWC(i,k) > 0._r8) .and. &
@@ -2751,15 +2748,6 @@ subroutine micro_pumas_tend (                                            &
                     ! rimed raindrops: forestALL
 
                     if (RIMR(i,k) > 0._r8) then
-                       IWCRF1 = LOG10(IWC(i,k))
-                       RIMCRF1 = LOG10(RIMC(i,k))
-                       RIMRRF1 = LOG10(RIMR(i,k))
-                       TEMPRF1 = LOG10(TEMPK(i,k))
-                       RHIRF1 = LOG10(RHI(i,k))
-                       LWCRF1 = LOG10(LWC(i,k))
-
-                       !! Combine all features into one vector
-                       FEATURES6(:) = (/ IWCRF1,RIMCRF1,TEMPRF1,RHIRF1,RIMRRF1,LWCRF1 /)
 
                        ! This subroutine reads the 6 inputs and gives 5
                        ! predictions for the SIP rates due to BR (BR_RATE),
@@ -2769,9 +2757,12 @@ subroutine micro_pumas_tend (                                            &
                        ! transferred to the cloud ice category.
 
 !!XXgoldyXX: Be sure to set proper usage on GPUs
-                       call runforestmulti(mdim6, max_nodes3, jbt, features6, &
-                            ypred1, ypred2, ypred3, ypred4, ypred5,           &
-                            leftchild3, rightchild3, splitfeat3, thresh3,     &
+                       call runforestmulti(mdim6, max_nodes3, jbt,        &
+                            (/ LOG10(IWC(i,k)), LOG10(RIMC(i,k)),         &
+                            LOG10(RIMR(i,k)), LOG10(TEMPK(i,k)),          &
+                            LOG10(RHI(i,k)), LOG10(LWC(i,k)) /),          &
+                            ypred1, ypred2, ypred3, ypred4, ypred5,       &
+                            leftchild3, rightchild3, splitfeat3, thresh3, &
                             out31, out32, out33, out34, out35)
 
                        BR_RATE(i,k) = 10._r8**(ypred1)
@@ -2815,24 +2806,18 @@ subroutine micro_pumas_tend (                                            &
 
                     else
 
-                       IWCRF2 = LOG10(IWC(i,k))
-                       RIMCRF2 = LOG10(RIMC(i,k))
-                       LWCRF2 = LOG10(LWC(i,k))
-                       TEMPRF2 = LOG10(TEMPK(i,k))
-                       RHIRF2 = LOG10(RHI(i,k))
-
-                       !! Combine all features into one vector
-                       FEATURES5(:) = (/ IWCRF2, RIMCRF2, TEMPRF2, RHIRF2, LWCRF2 /)
-
                        ! This subroutine reads the 5 inputs and gives 3
                        ! predictions for the SIP rates due to BR (BR_RATE)
                        ! and HM (HM_RATE), as well as the mass of cloud
                        ! droplets rimed onto the ice particle that will be
                        ! transferred to the cloud ice category (QICSIP).
 
-                       call runforestriv(mdim5, max_nodes1, jbt, features5, &
-                            ypred1, ypred2, ypred3,                         &
-                            leftchild1, rightchild1, splitfeat1, thresh1,   &
+                       call runforestriv(mdim5, max_nodes1, jbt,          &
+                            (/ LOG10(IWC(i,k)), LOG10(RIMC(i,k)),         &
+                            LOG10(LWC(i,k)), LOG10(TEMPK(i,k)),           &
+                            LOG10(RHI(i,k)) /),                           &
+                            ypred1, ypred2, ypred3,                       &
+                            leftchild1, rightchild1, splitfeat1, thresh1, &
                             out11, out12, out13)
 
                        BR_RATE(i,k) = 10._r8**(ypred1)
@@ -2865,15 +2850,6 @@ subroutine micro_pumas_tend (                                            &
                     ! raidrops: forestbrds
 
                     if (RIMR(i,k) > 0._r8) then
-                       IWCRF3 = LOG10(IWC(i,k))
-                       RIMCRF3 = LOG10(RIMC(i,k))
-                       RIMRRF3 = LOG10(RIMR(i,k))
-                       TEMPRF3 = LOG10(TEMPK(i,k))
-                       RHIRF3 = LOG10(RHI(i,k))
-                       LWCRF3 = LOG10(LWC(i,k))
-
-                       !! Combine all features into one vector
-                       FEATURES6(:) = (/ IWCRF3,RIMCRF3,TEMPRF3,RHIRF3,RIMRRF3,LWCRF3/)
 
                        ! This subroutine reads the 6 inputs and gives 3
                        ! predictions for the SIP rates due to BR (BR_RATE)
@@ -2881,7 +2857,10 @@ subroutine micro_pumas_tend (                                            &
                        ! rimed onto the ice particle that will be
                        ! transferred to the cloud ice category (QIRSIP).
 
-                       call runforestriv(mdim6, max_nodes4, jbt, features6,  &
+                       call runforestriv(mdim6, max_nodes4, jbt,             &
+                            (/ LOG10(IWC(i,k)), LOG10(RIMC(i,k)),            &
+                            LOG10(RIMR(i,k)), LOG10(TEMPK(i,k)),             &
+                            LOG10(RHI(i,k)), LOG10(LWC(i,k)) /),             &
                             ypred1, ypred2, ypred3, leftchild4, rightchild4, &
                             splitfeat4, thresh4, out41, out42, out43)
 
@@ -2909,19 +2888,13 @@ subroutine micro_pumas_tend (                                            &
                        ! raidrops: forestbr
                     else
 
-                       IWCRF4 = LOG10(IWC(i,k))
-                       RIMCRF4 = LOG10(RIMC(i,k))
-                       TEMPRF4 = LOG10(TEMPK(i,k))
-                       RHIRF4 = LOG10(RHI(i,k))
-                       LWCRF4 = LOG10(LWC(i,k))
-
-                       !! Combine all features into one vector
-                       FEATURES5(:) = (/ IWCRF4, RIMCRF4, TEMPRF4, RHIRF4, LWCRF4 /)
-
                        ! This subroutine reads the 5 inputs and predicts the
                        ! SIP rate due to BR (BR_RATE)
-                       call runforest(mdim5, max_nodes2, jbt, features5, &
-                            ypred1, leftchild2, rightchild2,             &
+                       call runforest(mdim5, max_nodes2, jbt,     &
+                            (/ LOG10(IWC(i,k)), LOG10(RIMC(i,k)), &
+                            LOG10(TEMPK(i,k)), LOG10(RHI(i,k)),   &
+                            LOG10(LWC(i,k)) /),                   &
+                            ypred1, leftchild2, rightchild2,      &
                             splitfeat2, thresh2, out21)
 
                        BR_RATE(i,k) = 10._r8**(ypred1)
@@ -2937,18 +2910,12 @@ subroutine micro_pumas_tend (                                            &
                     ! raidrops: forestbr
                  else if ((t(i,k) <= 273.15_r8) .and. (t(i,k) >= 270.15_r8)) then
 
-                    IWCRF5 = LOG10(IWC(i,k))
-                    RIMCRF5 = LOG10(RIMC(i,k))
-                    TEMPRF5 = LOG10(TEMPK(i,k))
-                    RHIRF5 = LOG10(RHI(i,k))
-                    LWCRF5 = LOG10(LWC(i,k))
-
-                    !! Combine all features into one vector
-                    FEATURES5(:) = (/ IWCRF5, RIMCRF5, TEMPRF5, RHIRF5, LWCRF5 /)
-
                     ! This subroutine reads the 5 inputs and predicts the
                     !   SIP rate due to BR (BR_RATE)
-                    call runforest(mdim5, max_nodes5, jbt, features5, ypred1, &
+                    call runforest(mdim5, max_nodes5, jbt,     &
+                         (/ LOG10(IWC(i,k)), LOG10(RIMC(i,k)), &
+                         LOG10(TEMPK(i,k)), LOG10(RHI(i,k)),   &
+                         LOG10(LWC(i,k)) /), ypred1,           &
                          leftchild5, rightchild5, splitfeat5, thresh5, out51)
 
                     BR_RATE(i,k) = 10._r8**(ypred1)
@@ -2958,7 +2925,7 @@ subroutine micro_pumas_tend (                                            &
               end if !lower bounds
 
               !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-              ! Combine the effect of all SIP processes into one SIP_RATE &
+              ! Combine the effect of all SIP processes into one SIP_RATE
               ! that will be added in the conservation law of ice
               ! crystals at the end of the model time-step
               !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2968,11 +2935,19 @@ subroutine micro_pumas_tend (                                            &
               ! training dataset
               SIP_RATE(i,k) = MIN(SIP_RATE(i,k),10._r8)
 
+              if (trim(rafsip_diags) /= 'None') then
+                 ! Save SIP rates
+                 proc_rates%BR_RATE(i,k) = BR_RATE(i,k)
+                 proc_rates%DS_RATE(i,k) = DS_RATE(i,k)
+                 proc_rates%HM_RATE(i,k) = HM_RATE(i,k)
+                 proc_rates%SIP_RATE(i,k) = SIP_RATE(i,k)
+              end if
+
            end do ! i = 1, mgcol
         end do ! k = 1, nlev
         !$acc end parallel
 
-     end if  !GS/PG RaFSIP
+     end if  ! rafsip_on
 ! RaFSIP GS/PG
   end if !do_cldice
 
@@ -3054,30 +3029,29 @@ subroutine micro_pumas_tend (                                            &
 
         ! conservation of qc
         !-------------------------------------------------------------------
+        dum = ((prc(i,k)+pra(i,k)+mnuccc(i,k)+mnucct(i,k)+msacwi(i,k)+ &
+             psacws(i,k)+bergs(i,k)+qmultg(i,k)+psacwg(i,k)+pgsacw(i,k))*lcldm(i,k)+ &
+             berg(i,k))*deltat
 ! RaFSIP GS/PG
         if (rafsip_on) then
-           dum = ((prc(i,k)+pra(i,k)+mnuccc(i,k)+mnucct(i,k)+msacwi(i,k)+ &
-                psacws(i,k)+bergs(i,k))*lcldm(i,k)+berg(i,k)+QICSIP(i,k)*lcldm(i,k))*deltat
-        else !RaFSIP
-! RaFSIP GS/PG
-           dum = ((prc(i,k)+pra(i,k)+mnuccc(i,k)+mnucct(i,k)+msacwi(i,k)+ &
-                psacws(i,k)+bergs(i,k)+qmultg(i,k)+psacwg(i,k)+pgsacw(i,k))*lcldm(i,k)+ &
-                berg(i,k))*deltat
-! RaFSIP GS/PG
+           dum = dum + (QICSIP(i,k)*lcldm(i,k)*deltat)
         end if
 ! RaFSIP GS/PG
         if (dum.gt.qc(i,k)) then
 ! RaFSIP GS/PG
+           ! Note: dum_2D(i,k) should (hopefully) be re-inserted below
+           !       added after berg(i,k)
+           dum_2D(i,k) = 0.0_r8
            if (rafsip_on) then
-              ratio = qc(i,k)/deltat/((prc(i,k)+pra(i,k)+mnuccc(i,k)+mnucct(i,k)+ &
-                   msacwi(i,k)+psacws(i,k)+bergs(i,k)+QICSIP(i,k))*lcldm(i,k)+berg(i,k))*omsm
-              QICSIP(i,k) = QICSIP(i,k)*ratio !RaFSIP
-           else !RaFSIP
+              dum_2D = (QICSIP(i,k)*lcldm(i,k))
+           end if
 ! RaFSIP GS/PG
-              ratio = qc(i,k)*rdeltat/((prc(i,k)+pra(i,k)+mnuccc(i,k)+mnucct(i,k)+ &
-                   msacwi(i,k)+psacws(i,k)+bergs(i,k)+qmultg(i,k)+psacwg(i,k)+pgsacw(i,k))*lcldm(i,k)+&
-                   berg(i,k))*omsm
+           ratio = qc(i,k)*rdeltat/((prc(i,k)+pra(i,k)+mnuccc(i,k)+mnucct(i,k)+ &
+                msacwi(i,k)+psacws(i,k)+bergs(i,k)+qmultg(i,k)+psacwg(i,k)+pgsacw(i,k))*lcldm(i,k)+&
+                berg(i,k)+dum_2D(i,k))*omsm
 ! RaFSIP GS/PG
+           if (rafsip_on) then
+              QICSIP(i,k) = QICSIP(i,k) * ratio !RaFSIP
            end if
 ! RaFSIP GS/PG
            qmultg(i,k)=qmultg(i,k)*ratio
@@ -3181,48 +3155,37 @@ subroutine micro_pumas_tend (                                            &
         ! conservation of rain mixing ratio
         !-------------------------------------------------------------------
 ! RaFSIP GS/PG
+        ! Note: dum_2D(i,k) should (hopefully) be re-inserted below
+        !       after pgracs(i,k) term in dum equation, if statement,
+        !       and in ratio calculation
+        dum_2D(i,k) = 0.0_r8
         if (rafsip_on) then
-           dum = ((-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k)+QIRSIP(i,k))*precip_frac(i,k)- & !RaFSIP
-                (pra(i,k)+prc(i,k))*lcldm(i,k))*deltat
-        else !RaFSIP
-! RaFSIP GS/PG
-           dum = ((-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k) &
-                +qmultrg(i,k)+pracg(i,k)+pgracs(i,k))*precip_frac(i,k)- &
-                (pra(i,k)+prc(i,k))*lcldm(i,k))*deltat
-! RaFSIP GS/PG
+           dum_2D(i,k) = QIRSIP(i,k)
         end if
 ! RaFSIP GS/PG
+        dum = ((-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k) &
+             +qmultrg(i,k)+pracg(i,k)+pgracs(i,k)+dum_2D(i,k))*precip_frac(i,k)- &
+             (pra(i,k)+prc(i,k))*lcldm(i,k))*deltat
         ! note that qrtend is included below because of instantaneous freezing/melt
+        if (dum.gt.qr(i,k).and. &
+             (-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k)+qmultrg(i,k)+pracg(i,k)+pgracs(i,k)+dum_2D(i,k)).ge.qsmall) then
+           ratio = (qr(i,k)*rdeltat+(pra(i,k)+prc(i,k))*lcldm(i,k))/   &
+                precip_frac(i,k)/(-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k) &
+                                +qmultrg(i,k)+pracg(i,k)+pgracs(i,k)+dum_2D(i,k))*omsm
 ! RaFSIP GS/PG
-        if (rafsip_on) then
-           if (dum.gt.qr(i,k).and. &
-                (-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k)+QIRSIP(i,k)).ge.qsmall) then
-              ratio = (qr(i,k)/deltat+(pra(i,k)+prc(i,k))*lcldm(i,k))/   &
-                   precip_frac(i,k)/(-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k)+QIRSIP(i,k))*omsm
-              pre(i,k)=pre(i,k)*ratio
-              pracs(i,k)=pracs(i,k)*ratio
-              mnuccr(i,k)=mnuccr(i,k)*ratio
-              mnuccri(i,k)=mnuccri(i,k)*ratio
-              QIRSIP(i,k)=QIRSIP(i,k)*ratio !RaFSIP
-           end if
-        else !RaFSIP
+           qmultrg(i,k)= qmultrg(i,k)*ratio
+           pracg(i,k)=pracg(i,k)*ratio
+           pgracs(i,k)=pgracs(i,k)*ratio
+           pre(i,k)=pre(i,k)*ratio
+           pracs(i,k)=pracs(i,k)*ratio
+           mnuccr(i,k)=mnuccr(i,k)*ratio
+           mnuccri(i,k)=mnuccri(i,k)*ratio
 ! RaFSIP GS/PG
-           if (dum.gt.qr(i,k).and. &
-                (-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k)+qmultrg(i,k)+pracg(i,k)+pgracs(i,k)).ge.qsmall) then
-              ratio = (qr(i,k)*rdeltat+(pra(i,k)+prc(i,k))*lcldm(i,k))/   &
-                   precip_frac(i,k)/(-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k) &
-                   +qmultrg(i,k)+pracg(i,k)+pgracs(i,k))*omsm
-              qmultrg(i,k)= qmultrg(i,k)*ratio
-              pracg(i,k)=pracg(i,k)*ratio
-              pgracs(i,k)=pgracs(i,k)*ratio
-              pre(i,k)=pre(i,k)*ratio
-              pracs(i,k)=pracs(i,k)*ratio
-              mnuccr(i,k)=mnuccr(i,k)*ratio
-              mnuccri(i,k)=mnuccri(i,k)*ratio
+           if (rafsip_on) then
+              QIRSIP(i,k)=QIRSIP(i,k)*ratio
            end if
 ! RaFSIP GS/PG
         end if
-! RaFSIP GS/PG
 
         ! conservation of rain number
         !-------------------------------------------------------------------
@@ -3257,8 +3220,7 @@ subroutine micro_pumas_tend (                                            &
   end do
   !$acc end parallel
 
-! RaFSIP GS/PG
-  if (do_cldice .and. rafsip_on) then
+  if (do_cldice) then
      !$acc parallel vector_length(VLENS) default(present)
      !$acc loop gang vector collapse(2)
      do k=1,nlev
@@ -3268,51 +3230,11 @@ subroutine micro_pumas_tend (                                            &
            dum = ((-mnuccc(i,k)-mnucct(i,k)-mnudep(i,k)-msacwi(i,k)-qmultg(i,k))*lcldm(i,k)+(prci(i,k)+ &
                 prai(i,k))*icldm(i,k)+(-qmultrg(i,k)-mnuccri(i,k))*precip_frac(i,k) &
                 -ice_sublim(i,k)-vap_dep(i,k)-berg(i,k)-mnuccd(i,k))*deltat
-           if (dum.gt.qi(i,k)) then
-              ratio = (qi(i,k)*rdeltat+vap_dep(i,k)+berg(i,k)+mnuccd(i,k)+ &
-                   (mnuccc(i,k)+mnucct(i,k)+mnudep(i,k)+msacwi(i,k)+qmultg(i,k))*lcldm(i,k)+ &
-                   (qmultrg(i,k)+mnuccri(i,k))*precip_frac(i,k))/ &
-                   ((prci(i,k)+prai(i,k))*icldm(i,k)-ice_sublim(i,k))*omsm
-              prci(i,k) = prci(i,k)*ratio
-              prai(i,k) = prai(i,k)*ratio
-              ice_sublim(i,k) = ice_sublim(i,k)*ratio
-           end if
-
-           ! conservation of ni
-           !-------------------------------------------------------------------
-           if (use_hetfrz_classnuc) then
-              tmpfrz = nnuccc(i,k)
-           else
-              tmpfrz = 0._r8
-           end if
-           ! RaFSIP GS/PG (this block differs from normal PUMAS)
-           dum = ((-nnucct(i,k)-tmpfrz-nnudep(i,k)-nsacwi(i,k))*lcldm(i,k)-(SIP_RATE(i,k)*lcldm(i,k))+(nprci(i,k)+ &
-                nprai(i,k)-nsubi(i,k))*icldm(i,k)-nnuccri(i,k)*precip_frac(i,k)- &
-                nnuccd(i,k))*deltat
-
-           if (dum.gt.ni(i,k)) then
-              ratio = (ni(i,k)/deltat+nnuccd(i,k)+ &
-                   (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k))*lcldm(i,k)+(SIP_RATE(i,k)*lcldm(i,k))+ &
-                   nnuccri(i,k)*precip_frac(i,k))/ &
-                   ((nprci(i,k)+nprai(i,k)-nsubi(i,k))*icldm(i,k))*omsm
-              nprci(i,k) = nprci(i,k)*ratio
-              nprai(i,k) = nprai(i,k)*ratio
-              nsubi(i,k) = nsubi(i,k)*ratio
-           end if
-        end do
-     end do
-     !$acc end parallel
 ! RaFSIP GS/PG
-  else if (do_cldice) then
-     !$acc parallel vector_length(VLENS) default(present)
-     !$acc loop gang vector collapse(2)
-     do k=1,nlev
-        do i=1,mgncol
-           ! conservation of qi
-           !-------------------------------------------------------------------
-           dum = ((-mnuccc(i,k)-mnucct(i,k)-mnudep(i,k)-msacwi(i,k)-qmultg(i,k))*lcldm(i,k)+(prci(i,k)+ &
-                prai(i,k))*icldm(i,k)+(-qmultrg(i,k)-mnuccri(i,k))*precip_frac(i,k) &
-                -ice_sublim(i,k)-vap_dep(i,k)-berg(i,k)-mnuccd(i,k))*deltat
+           if (rafsip_on) then
+              dum = dum - (SIP_RATE(i,k)*lcldm(i,k)*deltat)
+           end if
+! RaFSIP GS/PG
            if (dum.gt.qi(i,k)) then
               ratio = (qi(i,k)*rdeltat+vap_dep(i,k)+berg(i,k)+mnuccd(i,k)+ &
                    (mnuccc(i,k)+mnucct(i,k)+mnudep(i,k)+msacwi(i,k)+qmultg(i,k))*lcldm(i,k)+ &
@@ -3334,8 +3256,16 @@ subroutine micro_pumas_tend (                                            &
                 nprai(i,k)-nsubi(i,k))*icldm(i,k)+(-nmultrg(i,k)-nnuccri(i,k))*precip_frac(i,k)- &
                 nnuccd(i,k))*deltat
            if (dum.gt.ni(i,k)) then
+! RaFSIP GS/PG
+              ! Note: dum_2D(i,k) should (hopefully) be re-inserted below
+              !       after nmultg(i,k) term in ratio equation
+              dum_2D(i,k) = 0.0_r8
+              if (rafsip_on) then
+                 dum_2D(i,k) = SIP_RATE(i,k)
+              end if
+! RaFSIP GS/PG
               ratio = (ni(i,k)*rdeltat+nnuccd(i,k)+ &
-                 (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k)+nmultg(i,k))*lcldm(i,k)+ &
+                 (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k)+nmultg(i,k)+dum_2d(i,i))*lcldm(i,k)+ &
                  (nnuccri(i,k)+nmultrg(i,k))*precip_frac(i,k))/ &
                  ((nprci(i,k)+nprai(i,k)-nsubi(i,k))*icldm(i,k))*omsm
               nprci(i,k) = nprci(i,k)*ratio
@@ -3521,81 +3451,61 @@ subroutine micro_pumas_tend (                                            &
         qvlat(i,k) = qvlat(i,k)-(pre(i,k)+prds(i,k))*precip_frac(i,k)-&
              vap_dep(i,k)-vap_deps(i,k)-ice_sublim(i,k)-mnuccd(i,k)-mnudep(i,k)*lcldm(i,k) &
              -prdg(i,k)*precip_frac(i,k)
+        tlat(i,k) = tlat(i,k)+((pre(i,k)*precip_frac(i,k))*xxlv+ &
+             ((prds(i,k)+prdg(i,k))*precip_frac(i,k)+vap_dep(i,k)+vap_deps(i,k)+ice_sublim(i,k)+ &
+             mnuccd(i,k)+mnudep(i,k)*lcldm(i,k))*xxls+ &
+             ((bergs(i,k)+psacws(i,k)+mnuccc(i,k)+mnucct(i,k)+msacwi(i,k)+psacwg(i,k)+ &
+             qmultg(i,k)+pgsacw(i,k))*lcldm(i,k)+ &
+             (mnuccr(i,k)+pracs(i,k)+mnuccri(i,k)+pracg(i,k)+pgracs(i,k)+qmultrg(i,k))*precip_frac(i,k)+ &
+             berg(i,k))*xlf)
 ! RaFSIP GS/PG
         if (rafsip_on) then
-           tlat(i,k) = tlat(i,k)+((pre(i,k)*precip_frac(i,k))*xxlv+ &
-                ((prds(i,k)+prdg(i,k))*precip_frac(i,k)+vap_dep(i,k)+vap_deps(i,k)+ice_sublim(i,k)+ &
-                mnuccd(i,k)+mnudep(i,k)*lcldm(i,k))*xxls+ &
-                ((bergs(i,k)+psacws(i,k)+mnuccc(i,k)+mnucct(i,k)+msacwi(i,k)+psacwg(i,k)+ &
-                qmultg(i,k)+pgsacw(i,k))*lcldm(i,k)+ &
-                (mnuccr(i,k)+pracs(i,k)+mnuccri(i,k)+pracg(i,k)+pgracs(i,k)+qmultrg(i,k))*precip_frac(i,k)+ &
-                berg(i,k)+QICSIP(i,k)*lcldm(i,k)+QIRSIP(i,k)*precip_frac(i,k))*xlf)
-           qctend(i,k) = qctend(i,k)+ &
-                (-pra(i,k)-prc(i,k)-mnuccc(i,k)-mnucct(i,k)-msacwi(i,k)- &
-                psacws(i,k)-bergs(i,k)-QICSIP(i,k)-qmultg(i,k)-psacwg(i,k)-pgsacw(i,k))*lcldm(i,k)-berg(i,k)
-
-           if (do_cldice) then
-              qitend(i,k) = qitend(i,k)+ &
-                   (mnuccc(i,k)+mnucct(i,k)+mnudep(i,k)+msacwi(i,k)+qmultg(i,k))*lcldm(i,k)+(-prci(i,k)- &
-                   prai(i,k))*icldm(i,k)+vap_dep(i,k)+berg(i,k)+ice_sublim(i,k)+ &
-                   mnuccd(i,k)+(mnuccri(i,k)+QIRSIP(i,k)+qmultrg(i,k))*precip_frac(i,k)
-           end if
-
-           qrtend(i,k) = qrtend(i,k)+ &
-                (pra(i,k)+prc(i,k))*lcldm(i,k)+(pre(i,k)-pracs(i,k)- &
-                mnuccr(i,k)-mnuccri(i,k)-QIRSIP(i,k)-qmultrg(i,k)-pracg(i,k)-pgracs(i,k))*precip_frac(i,k)
-
-           if (do_hail.or.do_graupel) then
-              qgtend(i,k) = qgtend(i,k) + (pracg(i,k)+pgracs(i,k)+prdg(i,k)+psacr(i,k)+mnuccr(i,k))*precip_frac(i,k) &
-                   + (psacwg(i,k)+pgsacw(i,k))*lcldm(i,k)
-              qstend(i,k) = qstend(i,k)+ &
-                   (prai(i,k)+prci(i,k))*icldm(i,k)+(psacws(i,k)+bergs(i,k))*lcldm(i,k)+(prds(i,k)+ &
-                   pracs(i,k)-psacr(i,k))*precip_frac(i,k)+vap_deps(i,k)
-           else
-              !necessary since mnuccr moved to graupel
-              qstend(i,k) = qstend(i,k)+ &
-                   (prai(i,k)+prci(i,k))*icldm(i,k)+(psacws(i,k)+bergs(i,k))*lcldm(i,k)+(prds(i,k)+ &
-                   pracs(i,k)+mnuccr(i,k))*precip_frac(i,k)+vap_deps(i,k)
-           end if
-        else
+           tlat(i,k) = tlat(i,k)+((QICSIP(i,k)*lcldm(i,k)+QIRSIP(i,k)*precip_frac(i,k))*xlf)
+        end if
 ! RaFSIP GS/PG
-           tlat(i,k) = tlat(i,k)+((pre(i,k)*precip_frac(i,k))*xxlv+ &
-                ((prds(i,k)+prdg(i,k))*precip_frac(i,k)+vap_dep(i,k)+vap_deps(i,k)+ice_sublim(i,k)+ &
-                mnuccd(i,k)+mnudep(i,k)*lcldm(i,k))*xxls+ &
-                ((bergs(i,k)+psacws(i,k)+mnuccc(i,k)+mnucct(i,k)+msacwi(i,k)+psacwg(i,k)+ &
-                qmultg(i,k)+pgsacw(i,k))*lcldm(i,k)+ &
-                (mnuccr(i,k)+pracs(i,k)+mnuccri(i,k)+pracg(i,k)+pgracs(i,k)+qmultrg(i,k))*precip_frac(i,k)+ &
-                berg(i,k))*xlf)
-           qctend(i,k) = qctend(i,k)+ &
-                (-pra(i,k)-prc(i,k)-mnuccc(i,k)-mnucct(i,k)-msacwi(i,k)- &
-                psacws(i,k)-bergs(i,k)-qmultg(i,k)-psacwg(i,k)-pgsacw(i,k))*lcldm(i,k)-berg(i,k)
+        qctend(i,k) = qctend(i,k)+ &
+             (-pra(i,k)-prc(i,k)-mnuccc(i,k)-mnucct(i,k)-msacwi(i,k)- &
+             psacws(i,k)-bergs(i,k)-qmultg(i,k)-psacwg(i,k)-pgsacw(i,k))*lcldm(i,k)-berg(i,k)
+! RaFSIP GS/PG
+        if (rafsip_on) then
+           qctend(i,k) = qctend(i,k)-(QICSIP(i,k)*lcldm(i,k))
+        end if
+        ! Note:  (above) must match first term in 'dum' below in PUMAS
+! RaFSIP GS/PG
 
-           if (do_cldice) then
-              qitend(i,k) = qitend(i,k)+ &
-                   (mnuccc(i,k)+mnucct(i,k)+mnudep(i,k)+msacwi(i,k)+qmultg(i,k))*lcldm(i,k)+(-prci(i,k)- &
-                   prai(i,k))*icldm(i,k)+vap_dep(i,k)+berg(i,k)+ice_sublim(i,k)+ &
-                   mnuccd(i,k)+(mnuccri(i,k)+qmultrg(i,k))*precip_frac(i,k)
-           end if
-
-           qrtend(i,k) = qrtend(i,k)+ &
-                (pra(i,k)+prc(i,k))*lcldm(i,k)+(pre(i,k)-pracs(i,k)- &
-                mnuccr(i,k)-mnuccri(i,k)-qmultrg(i,k)-pracg(i,k)-pgracs(i,k))*precip_frac(i,k)
-
-           if (do_hail.or.do_graupel) then
-              qgtend(i,k) = qgtend(i,k) + (pracg(i,k)+pgracs(i,k)+prdg(i,k)+psacr(i,k)+mnuccr(i,k))*precip_frac(i,k) &
-                   + (psacwg(i,k)+pgsacw(i,k))*lcldm(i,k)
-              qstend(i,k) = qstend(i,k)+ &
-                   (prai(i,k)+prci(i,k))*icldm(i,k)+(psacws(i,k)+bergs(i,k))*lcldm(i,k)+(prds(i,k)+ &
-                   pracs(i,k)-psacr(i,k))*precip_frac(i,k)+vap_deps(i,k)
-           else
-              !necessary since mnuccr moved to graupel
-              qstend(i,k) = qstend(i,k)+ &
-                   (prai(i,k)+prci(i,k))*icldm(i,k)+(psacws(i,k)+bergs(i,k))*lcldm(i,k)+(prds(i,k)+ &
-                   pracs(i,k)+mnuccr(i,k))*precip_frac(i,k)+vap_deps(i,k)
+        if (do_cldice) then
+           qitend(i,k) = qitend(i,k)+ &
+                (mnuccc(i,k)+mnucct(i,k)+mnudep(i,k)+msacwi(i,k)+qmultg(i,k))*lcldm(i,k)+(-prci(i,k)- &
+                prai(i,k))*icldm(i,k)+vap_dep(i,k)+berg(i,k)+ice_sublim(i,k)+ &
+                mnuccd(i,k)+(mnuccri(i,k)+qmultrg(i,k))*precip_frac(i,k)
+! RaFSIP GS/PG
+           if (rafsip_on) then
+              qitend(i,k) = qitend(i,k)+(QIRSIP(i,k)*precip_frac(i,k))
            end if
 ! RaFSIP GS/PG
         end if
+
+        qrtend(i,k) = qrtend(i,k)+ &
+             (pra(i,k)+prc(i,k))*lcldm(i,k)+(pre(i,k)-pracs(i,k)- &
+             mnuccr(i,k)-mnuccri(i,k)-qmultrg(i,k)-pracg(i,k)-pgracs(i,k))*precip_frac(i,k)
 ! RaFSIP GS/PG
+        if (rafsip_on) then
+           qrtend(i,k) = qrtend(i,k)-(QIRSIP(i,k)*precip_frac(i,k))
+        end if
+! RaFSIP GS/PG
+
+        if (do_hail.or.do_graupel) then
+           qgtend(i,k) = qgtend(i,k) + (pracg(i,k)+pgracs(i,k)+prdg(i,k)+psacr(i,k)+mnuccr(i,k))*precip_frac(i,k) &
+                + (psacwg(i,k)+pgsacw(i,k))*lcldm(i,k)
+           qstend(i,k) = qstend(i,k)+ &
+                (prai(i,k)+prci(i,k))*icldm(i,k)+(psacws(i,k)+bergs(i,k))*lcldm(i,k)+(prds(i,k)+ &
+                pracs(i,k)-psacr(i,k))*precip_frac(i,k)+vap_deps(i,k)
+        else
+           !necessary since mnuccr moved to graupel
+           qstend(i,k) = qstend(i,k)+ &
+                (prai(i,k)+prci(i,k))*icldm(i,k)+(psacws(i,k)+bergs(i,k))*lcldm(i,k)+(prds(i,k)+ &
+                pracs(i,k)+mnuccr(i,k))*precip_frac(i,k)+vap_deps(i,k)
+        end if
      end do
   end do
   !$acc end parallel
@@ -3726,18 +3636,16 @@ subroutine micro_pumas_tend (                                            &
               tmpfrz = 0._r8
            end if
 ! RaFSIP GS/PG
+           ! Note: dum2A(i,k) should (hopefully) be re-inserted below
+           !       after nmultg(i,k) term in nitend equation
+           dum2A(i,k) = 0.0_r8
            if (rafsip_on) then
-              nitend(i,k) = nitend(i,k)+ nnuccd(i,k) + SIP_RATE(i,k)*lcldm(i,k) +  &
-                   (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k))*lcldm(i,k)+(nsubi(i,k)-nprci(i,k)- &
-                   nprai(i,k))*icldm(i,k)+nnuccri(i,k)*precip_frac(i,k)
-           else !RaFSIP
-! RaFSIP GS/PG
-              nitend(i,k) = nitend(i,k)+ nnuccd(i,k)+ &
-                   (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k)+nmultg(i,k))*lcldm(i,k)+(nsubi(i,k)-nprci(i,k)- &
-                   nprai(i,k))*icldm(i,k)+(nnuccri(i,k)+nmultrg(i,k))*precip_frac(i,k)
-! RaFSIP GS/PG
+              dum2A(i,k) = SIP_RATE(i,k)
            end if
 ! RaFSIP GS/PG
+           nitend(i,k) = nitend(i,k)+ nnuccd(i,k)+ &
+                (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k)+nmultg(i,k)+dum2A(i,k))*lcldm(i,k)+(nsubi(i,k)-nprci(i,k)- &
+                nprai(i,k))*icldm(i,k)+(nnuccri(i,k)+nmultrg(i,k))*precip_frac(i,k)
         end if
 
         if(do_graupel.or.do_hail) then
@@ -4541,7 +4449,7 @@ end if
                       (4._r8*pi*5.12e-16_r8*rhow)
 ! RaFSIP GS/PG
                  if (allocated(proc_rates%nimelttot)) then
-                    proc_rates%nimelttot(i,k)=nitend(i,k)-((1._r8-dum)*dumni(i,k)-ni(i,k))/deltat
+                    proc_rates%nimelttot(i,k)=nitend(i,k)-((1._r8-dum)*dumni(i,k)-ni(i,k))*rdeltat
                  end if
 ! RaFSIP GS/PG
                  nctend(i,k)=nctend(i,k)+proc_rates%nmelttot(i,k)
@@ -4599,18 +4507,17 @@ end if
               nimax = 0.0_r8
            end if
 ! RaFSIP GS/PG
+           ! Note: dum2A(i,k) should (hopefully) be re-inserted below after changes
+           !       in quantity tested for >0
+           !       in sum of terms for nimax calculation
+           dum2A(i,k) = 0.0_r8
            if (rafsip_on) then
-              if (nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+SIP_RATE(i,k) > 0._r8) then
-                 nimax = nimax+(nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+SIP_RATE(i,k))*lcldm(i,k)*deltat
-              end if
-           else !RaFSIP
-! RaFSIP GS/PG
-              if (nnucct(i,k)+nnuccc(i,k)+nnudep(i,k) > 0._r8) then
-                 nimax = nimax+(nnucct(i,k)+nnuccc(i,k)+nnudep(i,k))*lcldm(i,k)*deltat
-              end if
-! RaFSIP GS/PG
+              dum2A(i,k) = SIP_RATE(i,k)
            end if
 ! RaFSIP GS/PG
+           if (nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k) > 0._r8) then
+              nimax = nimax+(nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k))*lcldm(i,k)*deltat
+           end if
            if (do_cldice .and. (nitend(i,k) > 0._r8) .and.                    &
                 (ni(i,k) + (nitend(i,k)*deltat) > nimax)) then
               if (allocated(proc_rates%nitncons)) then
@@ -4822,7 +4729,7 @@ end if
            if (dum_2D(i,k) /= dumnc(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
 ! RaFSIP GS/PG
-              if ((dumnc(i,k) < dum) .and. allocated(proc_rates%nctnszmx)) then
+              if ((dumnc(i,k) < dum_2D(i,k)) .and. allocated(proc_rates%nctnszmx)) then
                  proc_rates%nctnszmx(i,k)=proc_rates%nctnszmx(i,k) + nctend(i,k)-(dumnc(i,k)*lcldm(i,k)-nc(i,k))*rdeltat
               else if (allocated(proc_rates%nctnszmn)) then
                  proc_rates%nctnszmn(i,k)=proc_rates%nctnszmn(i,k) + nctend(i,k)-(dumnc(i,k)*lcldm(i,k)-nc(i,k))*rdeltat
@@ -4951,7 +4858,7 @@ end if
         if (do_cldice .and. qi(i,k)+qitend(i,k)*deltat.lt.qsmall) then
 ! RaFSIP GS/PG
            if (allocated(proc_rates%nitnncld)) then
-              proc_rates%nitnncld(i,k) = proc_rates%nitnncld(i,k) + nitend(i,k) +ni(i,k)/deltat
+              proc_rates%nitnncld(i,k) = proc_rates%nitnncld(i,k) + nitend(i,k) +ni(i,k)*rdeltat
            end if
 ! RaFSIP GS/PG
            nitend(i,k)=-ni(i,k)*rdeltat
