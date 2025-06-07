@@ -1267,14 +1267,12 @@ subroutine micro_pumas_tend (                                            &
   !$acc               proc_rates%qrtend_TAU,proc_rates%nrtend_TAU,            &
   !$acc               proc_rates%gmnnn_lmnnn_TAU,                             &
   !$acc               proc_rates%nsubctot, proc_rates%nprc1tot,               &
-  !$acc               proc_rates%ncsedtentot, proc_rates%nisedtentot,         &
-  !$acc               proc_rates%nimelttot, proc_rates%nihomotot,             &
-  !$acc               proc_rates%nsubitot, proc_rates%npccntot,               &
-  !$acc               proc_rates%nctnszmx, proc_rates%nctnszmn,               &
-  !$acc               proc_rates%nctnncld, proc_rates%nitncons,               &
-  !$acc               proc_rates%nitnszmx, proc_rates%nitnszmn,               &
-  !$acc               proc_rates%nitnncld, proc_rates%frzr,                   &
-  !$acc               proc_rates%nfrzr,                                       &
+  !$acc               proc_rates%nimelttot, proc_rates%nsubitot,              &
+  !$acc               proc_rates%npccntot, proc_rates%nctnszmx,               &
+  !$acc               proc_rates%nctnszmn, proc_rates%nctnncld,               &
+  !$acc               proc_rates%nitncons, proc_rates%nitnszmx,               &
+  !$acc               proc_rates%nitnszmn, proc_rates%nitnncld,               &
+  !$acc               proc_rates%frzr,     proc_rates%nfrzr,                  &
   !$acc               proc_rates%BR_RATE, proc_rates%DS_RATE,                 &
   !$acc               proc_rates%HM_RATE, proc_rates%SIP_RATE,                &
   !$acc               proc_rates%IWC, proc_rates%RIMC, proc_rates%RIMR,       &
@@ -1668,10 +1666,7 @@ subroutine micro_pumas_tend (                                            &
         do i=1,mgncol
            proc_rates%nsubctot(i,k)    = 0.0_r8
            proc_rates%nprc1tot(i,k)    = 0.0_r8
-           proc_rates%ncsedtentot(i,k) = 0.0_r8 !! XXgoldyXX: Not sure how to set this
-           proc_rates%nisedtentot(i,k) = 0.0_r8 !! XXgoldyXX: Not sure how to set this
            proc_rates%nimelttot(i,k)   = 0.0_r8
-           proc_rates%nihomotot(i,k)   = 0.0_r8
            proc_rates%nsubitot(i,k)    = 0.0_r8
            proc_rates%npccntot(i,k)    = 0.0_r8
            proc_rates%nctnszmx(i,k)    = 0.0_r8
@@ -4483,12 +4478,6 @@ end if
                  ! assume 25 micron mean volume radius of homogeneously frozen droplets
                  ! consistent with size of detrained ice in stratiform.F90
                  proc_rates%nhomotot(i,k)=dum*3._r8*dumc(i,k)/(4._r8*3.14_r8*micro_mg_homog_size**3._r8*500._r8)*rdeltat
-! RaFSIP GS/PG
-                 if (allocated(proc_rates%nihomotot)) then
-                    proc_rates%nihomotot(i,k)=dum*3._r8*dumc(i,k)/(4._r8*3.14_r8*1.563e-14_r8* &
-                         500._r8)*rdeltat
-                 end if
-! RaFSIP GS/PG
                  nitend(i,k)=nitend(i,k)+proc_rates%nhomotot(i,k)
 
                  qctend(i,k)=((1._r8-dum)*dumc(i,k)-qc(i,k))*rdeltat

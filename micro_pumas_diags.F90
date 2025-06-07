@@ -139,10 +139,8 @@ use pumas_kinds,   only: r8=>kind_r8
 ! RaFSIP GS/PG
   real(r8), allocatable :: nsubctot(:,:)    ! evaporation of droplet
   real(r8), allocatable :: nprc1tot(:,:)    ! autoconversion
-  real(r8), allocatable :: ncsedtentot(:,:) ! nqc sedimentation tendency
-  real(r8), allocatable :: nisedtentot(:,:) ! nqi sedimentation tendency
   real(r8), allocatable :: nimelttot(:,:)   ! ni melting of cloud ice
-  real(r8), allocatable :: nihomotot(:,:)   ! ni homogeneos freezign cloud water
+  real(r8), allocatable :: nihomotot(:,:)   ! ni homogeneos freezing cloud water
   real(r8), allocatable :: nsubitot(:,:)    ! evaporation of cloud ice number (sublimation?)
   real(r8), allocatable :: npccntot(:,:)    ! droplet activation
 !
@@ -689,14 +687,6 @@ contains
          if (ierr /= 0) then
             errstring='Error allocating this%nprc1tot'
          end if
-         allocate(this%ncsedtentot(psetcols,nlev), stat=ierr)
-         if (ierr /= 0) then
-            errstring='Error allocating this%ncsedtentot'
-         end if
-         allocate(this%nisedtentot(psetcols,nlev), stat=ierr)
-         if (ierr /= 0) then
-            errstring='Error allocating this%nisedtentot'
-         end if
          allocate(this%nimelttot(psetcols,nlev), stat=ierr)
          if (ierr /= 0) then
             errstring='Error allocating this%nimelttot'
@@ -933,8 +923,6 @@ contains
       if (rafsip_on) then
          deallocate(this%nsubctot)
          deallocate(this%nprc1tot)
-         deallocate(this%ncsedtentot)
-         deallocate(this%nisedtentot)
          deallocate(this%nimelttot)
          deallocate(this%nihomotot)
          deallocate(this%nsubitot)
