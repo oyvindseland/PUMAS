@@ -127,6 +127,20 @@ use micro_pumas_utils, only: &
      rising_factorial, &
      VLENS
 
+! RaFSIP GS/PG
+use module_random_forests, only: rafsip_on, rafsip_diags, jbt
+use module_random_forests, only: max_nodes1, leftchild1, rightchild1, splitfeat1
+use module_random_forests, only: thresh1, out11, out12, out13
+use module_random_forests, only: max_nodes2, leftchild2, rightchild2, splitfeat2
+use module_random_forests, only: thresh2, out21
+use module_random_forests, only: max_nodes3, leftchild3, rightchild3, splitfeat3
+use module_random_forests, only: thresh3, out31, out32, out33, out34, out35
+use module_random_forests, only: max_nodes4, leftchild4, rightchild4, splitfeat4
+use module_random_forests, only: thresh4, out41, out42, out43
+use module_random_forests, only: max_nodes5, leftchild5, rightchild5, splitfeat5
+use module_random_forests, only: thresh5, out51
+! RaFSIP GS/PG
+
 implicit none
 private
 save
@@ -343,6 +357,9 @@ subroutine micro_pumas_init( &
   use micro_pumas_utils,            only: micro_pumas_utils_init
   use pumas_stochastic_collect_tau, only: pumas_stochastic_kernel_init
   use tau_neural_net_quantile,      only: initialize_tau_emulators
+! RaFSIP GS/PG
+  use module_random_forests,        only: sec_ice_init
+! RaFSIP GS/PG
 
   !-----------------------------------------------------------------------
   !
@@ -563,60 +580,67 @@ subroutine micro_pumas_init( &
                                     stochastic_emulated_filename_output_scale, iulog, errstring)
   end if
 
+  if (rafsip_on) then
+     ! RaFSIP: INITIALIZE THE RANDOM FOREST PARAMETERS
+     call sec_ice_init()
+  end if
+
+
 end subroutine micro_pumas_init
 
 !===============================================================================
 !microphysics routine for each timestep goes here...
 
-subroutine micro_pumas_tend ( &
-     mgncol,             nlev,               deltatin,           &
-     t,                            q,                            &
-     qcn,                          qin,                          &
-     ncn,                          nin,                          &
-     qrn,                          qsn,                          &
-     nrn,                          nsn,                          &
-     qgr,                          ngr,                          &
-     relvar,                       accre_enhan,                  &
-     p,                            pdel, pint,                   &
-     cldn,    liqcldf,        icecldf,       qsatfac,            &
-     qcsinksum_rate1ord,                                         &
-     naai,                         npccn,                        &
-     rndst,                        nacon,                        &
-     tlat,                         qvlat,                        &
-     qctend,                       qitend,                       &
-     nctend,                       nitend,                       &
-     qrtend,                       qstend,                       &
-     nrtend,                       nstend,                       &
-     qgtend,                       ngtend,                       &
-     effc,               effc_fn,            effi,               &
-     sadice,                       sadsnow,                      &
-     prect,                        preci,                        &
-     nevapr,                       am_evp_st,                    &
-     prain,                                                      &
-     cmeout,                       deffi,                        &
-     pgamrad,                      lamcrad,                      &
-     qsout,                        dsout,                        &
-     qgout,     ngout,             dgout,                        &
-     lflx,               iflx,                                   &
-     gflx,                                                       &
-     rflx,               sflx,               qrout,              &
-     reff_rain,          reff_snow,          reff_grau,          &
-     nrout,                        nsout,                        &
-     refl,               arefl,              areflz,             &
-     frefl,              csrfl,              acsrfl,             &
-     fcsrfl,        refl10cm, reflz10cm,     rercld,             &
-     ncai,                         ncal,                         &
-     qrout2,                       qsout2,                       &
-     nrout2,                       nsout2,                       &
-     drout2,                       dsout2,                       &
-     qgout2,        ngout2,        dgout2,    freqg,                   &
-     freqs,                        freqr,                        &
-     nfice,                        qcrat,                        &
-     proc_rates,                                                 &
-     errstring, &
-     tnd_qsnow,          tnd_nsnow,          re_ice,             &
-     prer_evap,                                                      &
-     frzimm,             frzcnt,             frzdep)
+subroutine micro_pumas_tend (                                            &
+     mgncol,             nlev,               deltatin,                   &
+     t,                            q,                                    &
+     qcn,                          qin,                                  &
+     ncn,                          nin,                                  &
+     qrn,                          qsn,                                  &
+     nrn,                          nsn,                                  &
+     qgr,                          ngr,                                  &
+     relvar,                       accre_enhan,                          &
+     p,                            pdel, pint,                           &
+     cldn,    liqcldf,        icecldf,       qsatfac,                    &
+     qcsinksum_rate1ord,                                                 &
+     naai,                         npccn,                                &
+     rndst,                        nacon,                                &
+     tlat,                         qvlat,                                &
+     qctend,                       qitend,                               &
+     nctend,                       nitend,                               &
+     qrtend,                       qstend,                               &
+     nrtend,                       nstend,                               &
+     qgtend,                       ngtend,                               &
+     effc,               effc_fn,            effi,                       &
+     sadice,                       sadsnow,                              &
+     prect,                        preci,                                &
+     nevapr,                       am_evp_st,                            &
+     prain,                                                              &
+     cmeout,                       deffi,                                &
+     pgamrad,                      lamcrad,                              &
+     qsout,                        dsout,                                &
+     qgout,     ngout,             dgout,                                &
+     lflx,               iflx,                                           &
+     gflx,                                                               &
+     rflx,               sflx,               qrout,                      &
+     reff_rain,          reff_snow,          reff_grau,                  &
+     nrout,                        nsout,                                &
+     refl,               arefl,              areflz,                     &
+     frefl,              csrfl,              acsrfl,                     &
+     fcsrfl,        refl10cm, reflz10cm,     rercld,                     &
+     ncai,                         ncal,                                 &
+     qrout2,                       qsout2,                               &
+     nrout2,                       nsout2,                               &
+     drout2,                       dsout2,                               &
+     qgout2,        ngout2,        dgout2,    freqg,                     &
+     freqs,                        freqr,                                &
+     nfice,                        qcrat,                                &
+     proc_rates,                                                         &
+     errstring,                                                          &
+     tnd_qsnow,          tnd_nsnow,          re_ice,                     &
+     prer_evap,                                                          &
+     frzimm,             frzcnt,             frzdep                      &
+     )
 
   use pumas_stochastic_collect_tau, only: ncd, pumas_stochastic_collect_tau_tend
   use tau_neural_net_quantile,      only: tau_emulated_cloud_rain_interactions
@@ -667,6 +691,13 @@ subroutine micro_pumas_tend ( &
        evaporate_sublimate_precip_graupel
 
   use micro_pumas_diags, only: proc_rates_type
+
+! RaFSIP GS/PG
+  use module_random_forests, only: MDIM5, MDIM6
+  use module_random_forests, only: runforestmulti
+  use module_random_forests, only: runforestriv
+  use module_random_forests, only: runforest
+! RaFSIP GS/PG
 
   !Authors: Hugh Morrison, Andrew Gettelman, NCAR, Peter Caldwell, LLNL
   ! e-mail: morrison@ucar.edu, andrew@ucar.edu
@@ -1001,6 +1032,9 @@ subroutine micro_pumas_tend ( &
 
   ! relative humidity
   real(r8) :: relhum(mgncol,nlev)
+  ! RaFSIP GS/PG
+  real(r8) :: relhumi(mgncol,nlev)
+  ! RaFSIP GS/PG
 
   ! parameters for cloud water and cloud ice sedimentation calculations
   real(r8) :: fc(mgncol,nlev)
@@ -1015,6 +1049,23 @@ subroutine micro_pumas_tend ( &
   real(r8) :: fns(mgncol,nlev)
 
   real(r8) :: rthrsh     ! rain rate threshold for reflectivity calculation
+
+  ! RaFSIP GS/PG, additional parameters
+  ! Inputs to SIP parameterization
+  real(r8) ::  IWC(mgncol,nlev)      ! TOTAL ICE WATER CONTENT IN KG/KG INPUT TO RaFSIP
+  real(r8) ::  RIMC(mgncol,nlev)     ! TOTAL CLOUD DROPLET RIMING IN KG/KG/S INPUT TO RaFSIP
+  real(r8) ::  RIMR(mgncol,nlev)     ! TOTAL RAINDROP RIMING IN KG/KG/S INPUT TO RaFSIP
+  real(r8) ::  TEMPK(mgncol,nlev)    ! TEMPERATURE IN K INPUT TO RaFSIP
+  real(r8) ::  RHI(mgncol,nlev)      ! RELATIVE HUMIDITY WRT ICE INPUT TO RaFSIP
+  real(r8) ::  LWC(mgncol,nlev)      ! TOTAL LIQUID WATER CONTENT IN KG/KG INPUT TO RaFSIP
+                                     !Outputs
+  real(r8) ::  BR_RATE(mgncol,nlev)  ! SIP RATE DUE TO COLLISIONAL BREAK-UP
+  real(r8) ::  DS_RATE(mgncol,nlev)  ! SIP RATE DUE TO DROPLET-SHATTERING
+  real(r8) ::  HM_RATE(mgncol,nlev)  ! SIP RATE DUE TO HALLETT-MOSSOP
+  real(r8) ::  SIP_RATE(mgncol,nlev) ! TOTAL SIP rate predicted by the RaFSIP (kg-1 s-1)
+  real(r8) ::  QIRSIP(mgncol,nlev)   ! MASS TRASFERRED FROM RAINDROPS TO CLOUD ICE DUE TO HM OR DS
+  real(r8) ::  QICSIP(mgncol,nlev)   ! MASS TRASFERRED FROM CLOUD DROPLETS TO CLOUD ICE DUE TO THE DS
+  ! RaFSIP GS/PG
 
   ! dummy variables
   real(r8) :: dum, dum1, dum2, dum3, dum4, qtmp
@@ -1098,6 +1149,13 @@ subroutine micro_pumas_tend ( &
   integer nstep_g(mgncol)
   real(r8) :: rnstep_g(mgncol)
 
+  ! RaFSIP GS/PG
+  ! Dummy variables used to define the inputs/features and outputs/targets
+  !    of the RaFSIP parameterization !GS/PG
+  real(r8) :: YPRED1,YPRED2,YPRED3,YPRED4,YPRED5
+  real(r8) :: nimax
+  ! RaFSIP GS/PG
+
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
   ! Initialize scale height (H) for interface height calculation
@@ -1140,7 +1198,8 @@ subroutine micro_pumas_tend ( &
   !$acc               naai,npccn,rndst,nacon,tnd_qsnow,tnd_nsnow,re_ice,      &
   !$acc               frzimm,frzcnt,frzdep,mg_liq_props,mg_ice_props,         &
   !$acc               mg_rain_props,mg_graupel_props,mg_hail_props,           &
-  !$acc               mg_snow_props,proc_rates)                               &
+  !$acc               mg_snow_props,proc_rates,                               &
+  !$acc               rafsip_on)                                              &
   !$acc      copyout (qcsinksum_rate1ord,tlat,qvlat,qctend,qitend,nctend,     &
   !$acc               nitend,qrtend,qstend,nrtend,nstend,qgtend,ngtend,       &
   !$acc               effc,effc_fn,effi,sadice,sadsnow,prect,preci,           &
@@ -1206,7 +1265,18 @@ subroutine micro_pumas_tend ( &
   !$acc               proc_rates%qrtend_SB2001,proc_rates%nrtend_SB2001,      &
   !$acc               proc_rates%qctend_TAU,proc_rates%nctend_TAU,            &
   !$acc               proc_rates%qrtend_TAU,proc_rates%nrtend_TAU,            &
-  !$acc               proc_rates%gmnnn_lmnnn_TAU)                             &
+  !$acc               proc_rates%gmnnn_lmnnn_TAU,                             &
+  !$acc               proc_rates%nsubctot, proc_rates%nprc1tot,               &
+  !$acc               proc_rates%nimelttot, proc_rates%nsubitot,              &
+  !$acc               proc_rates%npccntot, proc_rates%nctnszmx,               &
+  !$acc               proc_rates%nctnszmn, proc_rates%nctnncld,               &
+  !$acc               proc_rates%nitncons, proc_rates%nitnszmx,               &
+  !$acc               proc_rates%nitnszmn, proc_rates%nitnncld,               &
+  !$acc               proc_rates%frzr,     proc_rates%nfrzr,                  &
+  !$acc               proc_rates%BR_RATE, proc_rates%DS_RATE,                 &
+  !$acc               proc_rates%HM_RATE, proc_rates%SIP_RATE,                &
+  !$acc               proc_rates%IWC, proc_rates%RIMC, proc_rates%RIMR,       &
+  !$acc               proc_rates%RHI, proc_rates%LWC)                         &
   !$acc      create  (qc,qi,nc,ni,qr,qs,nr,ns,qg,ng,rho,dv,mu,sc,rhof,        &
   !$acc               precip_frac,cldm,icldm,lcldm,qsfm,qcic,qiic,qsic,qric,  &
   !$acc               qgic,ncic,niic,nsic,nric,ngic,lami,n0i,lamc,pgam,lams,  &
@@ -1226,7 +1296,12 @@ subroutine micro_pumas_tend ( &
   !$acc               ntmp,zint,nstep_i,rnstep_i,nstep_l,rnstep_l,nstep_r,    &
   !$acc               rnstep_r,nstep_s,rnstep_s,nstep_g,rnstep_g,prect_i,     &
   !$acc               tlat_i,qvlat_i,preci_i,prect_l,tlat_l,qvlat_l,prect_r,  &
-  !$acc               prect_s,preci_s,prect_g,preci_g)
+  !$acc               prect_s,preci_s,prect_g,preci_g,                        &
+  !$acc               relhumi, nimax,                                         &
+  !$acc               YPRED1,YPRED2,YPRED3,YPRED4,YPRED5, nimax,              &
+  !$acc               IWC, RIMC, RIMR, TEMPK, RHI, LWC,                       &
+  !$acc               BR_RATE, DS_RATE, HM_RATE, SIP_RATE, QIRSIP, QICSIP     &
+  !$acc               )
 
   ! Copies of input concentrations that may be changed internally.
 
@@ -1359,6 +1434,11 @@ subroutine micro_pumas_tend ( &
         end if
 
         relhum(i,k) = q(i,k) / max(qvl(i,k), qsmall)
+  ! RaFSIP GS/PG
+        if (rafsip_on) then
+           relhumi(i,k) = q(i,k) / max(qvi(i,k), qsmall)
+        end if
+  ! RaFSIP GS/PG
 
      end do
   end do
@@ -1470,6 +1550,7 @@ subroutine micro_pumas_tend ( &
         lami(i,k)               = 0._r8
         n0s(i,k)                = 0._r8
         lams(i,k)               = 0._r8
+        ninstsm(i,k)            = 0._r8
         ninstgm(i,k)            = 0._r8
         psacws(i,k)             = 0._r8
         pracs(i,k)              = 0._r8
@@ -1575,6 +1656,56 @@ subroutine micro_pumas_tend ( &
      end do
   end do
   !$acc end parallel
+
+! RaFSIP GS/PG
+  ! initialize RaFSIP variables
+  if (rafsip_on) then
+     !$acc parallel vector_length(VLENS) default(present)
+     !$acc loop gang vector collapse(2)
+     do k=1,nlev
+        do i=1,mgncol
+           proc_rates%nsubctot(i,k)    = 0.0_r8
+           proc_rates%nprc1tot(i,k)    = 0.0_r8
+           proc_rates%nimelttot(i,k)   = 0.0_r8
+           proc_rates%nsubitot(i,k)    = 0.0_r8
+           proc_rates%npccntot(i,k)    = 0.0_r8
+           proc_rates%nctnszmx(i,k)    = 0.0_r8
+           proc_rates%nctnszmn(i,k)    = 0.0_r8
+           proc_rates%nctnncld(i,k)    = 0.0_r8
+           proc_rates%nitncons(i,k)    = 0.0_r8
+           proc_rates%nitnszmx(i,k)    = 0.0_r8
+           proc_rates%nitnszmn(i,k)    = 0.0_r8
+           proc_rates%nitnncld(i,k)    = 0.0_r8
+           proc_rates%frzr(i,k)        = 0.0_r8
+           proc_rates%nfrzr(i,k)       = 0.0_r8
+           if (trim(rafsip_diags) /= 'None') then
+              proc_rates%BR_RATE(i,k)     = 0.0_r8
+              proc_rates%DS_RATE(i,k)     = 0.0_r8
+              proc_rates%HM_RATE(i,k)     = 0.0_r8
+              proc_rates%SIP_RATE(i,k)    = 0.0_r8
+           end if
+           if (trim(rafsip_diags) == 'All') then
+              proc_rates%IWC(i,k)         = 0.0_r8
+              proc_rates%RIMC(i,k)        = 0.0_r8
+              proc_rates%RIMR(i,k)        = 0.0_r8
+              proc_rates%RHI(i,k)         = 0.0_r8
+              proc_rates%LWC(i,k)         = 0.0_r8
+           end if
+        end do
+     end do
+     !$acc end parallel
+  end if
+! RaFSIP GS/PG
+
+! RaFSIP GS/PG
+  ! Dummy variables used to define the inputs/features and outputs/targets
+  !    of the RaFSIP parameterization !GS/PG
+  YPRED1       = 0.0_r8
+  YPRED2       = 0.0_r8
+  YPRED3       = 0.0_r8
+  YPRED4       = 0.0_r8
+  YPRED5       = 0.0_r8
+! RaFSIP GS/PG
 
   !$acc parallel vector_length(VLENS) default(present)
   !$acc loop gang vector collapse(2)
@@ -1697,6 +1828,31 @@ subroutine micro_pumas_tend ( &
      end do
      !$acc end parallel
   end if
+
+! RaFSIP GS/PG
+ ! RaFSIP zero process rates
+  if (rafsip_on) then
+     !$acc parallel vector_length(VLENS) default(present)
+     !$acc loop gang vector collapse(2)
+     do k=1,nlev
+        do i=1,mgncol
+           IWC(i,k) = 0._r8
+           RIMR(i,k) = 0._r8
+           LWC(i,k) = 0._r8
+           RIMC(i,k) = 0._r8
+           TEMPK(i,k) = 0._r8
+           RHI(i,k) = 0._r8
+           BR_RATE(i,k) = 0._r8
+           DS_RATE(i,k) = 0._r8
+           HM_RATE(i,k) = 0._r8
+           SIP_RATE(i,k) = 0._r8
+           QIRSIP(i,k) = 0._r8
+           QICSIP(i,k) = 0._r8
+        end do
+     end do
+     !$acc end parallel
+  end if
+! RaFSIP GS/PG
 
   !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   ! droplet activation
@@ -2385,7 +2541,23 @@ subroutine micro_pumas_tend ( &
   !$acc end parallel
 
   if (do_cldice) then
-     call secondary_ice_production(t, psacws, msacwi, nsacwi, mgncol*nlev)
+! RaFSIP GS/PG
+     if (rafsip_on) then
+        !$acc parallel vector_length(VLENS) default(present)
+        !$acc loop gang vector collapse(2)
+        do k=1,nlev
+           do i=1,mgncol
+              nsacwi(i,k) = 0.0_r8
+              msacwi(i,k) = 0.0_r8
+           end do
+        end do
+        !$acc end parallel
+     else
+! RaFSIP GS/PG
+        call secondary_ice_production(t, psacws, msacwi, nsacwi, mgncol*nlev)
+! RaFSIP GS/PG
+     end if
+! RaFSIP GS/PG
   else
      !$acc parallel vector_length(VLENS) default(present)
      !$acc loop gang vector collapse(2)
@@ -2518,6 +2690,260 @@ subroutine micro_pumas_tend ( &
         end do
      end do
      !$acc end parallel
+
+! RaFSIP GS/PG
+     ! Compute secondary ice production
+     if (rafsip_on) then
+        !$acc parallel vector_length(VLENS) default(present)
+        !$acc loop gang vector collapse(2)
+        do k=1, nlev
+           do i = 1, mgncol
+              !! Initialize all variables to zero
+              BR_RATE(i,k) = 0._r8
+              DS_RATE(i,k) = 0._r8
+              HM_RATE(i,k) = 0._r8
+              SIP_RATE(i,k) = 0._r8
+              QIRSIP(i,k) = 0._r8
+              QICSIP(i,k) = 0._r8
+              !! First we define all the useful parameters
+              !! that will be used as inputs to the parameterization
+              ! The total ice water content in kg/kg
+              IWC(i,k) = qiic(i,k) + qsic(i,k)
+              ! The total amount of cloud droplets rimed onto ice particles in kg/kg/s
+              RIMC(i,k) = psacws(i,k)
+              ! The total amount of raindrops rimed onto ice particles in kg/kg/s
+              RIMR(i,k) = pracs(i,k)
+              ! Ambient temperature in K
+              TEMPK(i,k) = t(i,k)
+              ! Relative humidity with respect to ice
+              RHI(i,k) = relhumi(i,k)
+              ! The total liquid water content in kg/kg
+              LWC(i,k) = qcic(i,k)+qric(i,k)
+
+              if (trim(rafsip_diags) == 'All') then
+                 ! Save parameters as diagnostics
+                 proc_rates%IWC(i,k)  = IWC(i,k)
+                 proc_rates%RIMC(i,k) = RIMC(i,k)
+                 proc_rates%RIMR(i,k) = RIMR(i,k)
+                 proc_rates%RHI(i,k)  = RHI(i,k)
+                 proc_rates%LWC(i,k)  = LWC(i,k)
+              end if
+
+              ! Lower bounds
+              if ((RIMC(i,k) > 0._r8) .and. (IWC(i,k) > 0._r8) .and. &
+                   (LWC(i,k) > 0._r8) .and. (RHI(i,k) > 0._r8)) then
+
+                 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                 ! IF WE ARE WITHIN THE HALLETT-MOSSOP TEMPERATURE RANGE
+                 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                 if ((t(i,k) < 270.15_r8) .and. (t(i,k) >= 265.15_r8)) then
+
+                    ! Activation of all secondary ice production processes
+                    ! within the HM temperature range, in the presence of
+                    ! rimed raindrops: forestALL
+
+                    if (RIMR(i,k) > 0._r8) then
+
+                       ! This subroutine reads the 6 inputs and gives 5
+                       ! predictions for the SIP rates due to BR (BR_RATE),
+                       ! HM (HM_RATE) and DS (DS_RATE), as well as the mass of
+                       ! cloud droplets (QICSIP) and raindrops (QIRSIP)
+                       ! rimed onto the ice particle that will be
+                       ! transferred to the cloud ice category.
+
+!!XXgoldyXX: Be sure to set proper usage on GPUs
+                       call runforestmulti(mdim6, max_nodes3, jbt,        &
+                            (/ LOG10(IWC(i,k)), LOG10(RIMC(i,k)),         &
+                            LOG10(RIMR(i,k)), LOG10(TEMPK(i,k)),          &
+                            LOG10(RHI(i,k)), LOG10(LWC(i,k)) /),          &
+                            ypred1, ypred2, ypred3, ypred4, ypred5,       &
+                            leftchild3, rightchild3, splitfeat3, thresh3, &
+                            out31, out32, out33, out34, out35)
+
+                       BR_RATE(i,k) = 10._r8**(ypred1)
+                       BR_RATE(i,k) = MAX(BR_RATE(i,k),0._r8)
+
+                       HM_RATE(i,k) = 10._r8**(ypred2)
+                       HM_RATE(i,k) = MAX(HM_RATE(i,k),0._r8)
+
+                       DS_RATE(i,k) = 10._r8**(ypred3)
+                       DS_RATE(i,k) = MAX(DS_RATE(i,k),0._r8)
+
+                       !! Mass transfer from cloud droplets/raindrops to
+                       ! cloud ice if HM_RATE>0 and/or DS_RATE>0
+                       if (HM_RATE(i,k) > 0._r8) then
+                          QICSIP(i,k) = 10._r8**(ypred4)
+                          ! RIMC=PSACWS, only max 1% of the rimed mass
+                          !   can be used for SIP
+                          QICSIP(i,k) = MIN(QICSIP(i,k),0.01_r8*RIMC(i,k))
+                          QICSIP(i,k) = MAX(QICSIP(i,k),0._r8)
+                          ! Remove the mass of rimed cloud droplets that is
+                          ! involved in SIP
+                          PSACWS(i,k) = PSACWS(i,k) - QICSIP(i,k)
+                       end if ! MASS TRANSFER
+
+                       if ((HM_RATE(i,k) > 0._r8) .or. (DS_RATE(i,k) > 0._r8)) then
+                          QIRSIP(i,k) = 10._r8**(ypred5)
+                          ! RIMR=PRACS, only max 1% of the rimed mass can be
+                          ! used for SIP
+                          QIRSIP(i,k) = MIN(QIRSIP(i,k),0.01_r8*RIMR(i,k))
+                          QIRSIP(i,k) = MAX(QIRSIP(i,k),0._r8)
+                          ! Remove the mass of rimed raindrops that is
+                          ! involved in SIP
+                          PRACS(i,k) = PRACS(i,k) - QIRSIP(i,k)
+                       END IF !MASS TRANSFER
+
+
+                       ! Activation of the collisional break-up and the
+                       ! hallett-mossop process if temperature is
+                       ! between -8<=T<-3 C, in the absence of rimed
+                       ! raindrops: forestbrhm
+
+                    else
+
+                       ! This subroutine reads the 5 inputs and gives 3
+                       ! predictions for the SIP rates due to BR (BR_RATE)
+                       ! and HM (HM_RATE), as well as the mass of cloud
+                       ! droplets rimed onto the ice particle that will be
+                       ! transferred to the cloud ice category (QICSIP).
+
+                       call runforestriv(mdim5, max_nodes1, jbt,          &
+                            (/ LOG10(IWC(i,k)), LOG10(RIMC(i,k)),         &
+                            LOG10(LWC(i,k)), LOG10(TEMPK(i,k)),           &
+                            LOG10(RHI(i,k)) /),                           &
+                            ypred1, ypred2, ypred3,                       &
+                            leftchild1, rightchild1, splitfeat1, thresh1, &
+                            out11, out12, out13)
+
+                       BR_RATE(i,k) = 10._r8**(ypred1)
+                       BR_RATE(i,k) = MAX(BR_RATE(i,k),0._r8)
+
+                       HM_RATE(i,k) = 10._r8**(ypred2)
+                       HM_RATE(i,k) = MAX(HM_RATE(i,k),0._r8)
+
+                       !! Mass transfer from cloud droplets to cloud ice if HM_RATE>0
+                       if (HM_RATE(i,k) > 0._r8) then
+                          QICSIP(i,k) = 10._r8**(ypred3)
+                          ! RIMC=PSACWS, only max 1% of the rimed mass
+                          !   can be used for SIP
+                          QICSIP(i,k) = MIN(QICSIP(i,k),0.01_r8*RIMC(i,k))
+                          QICSIP(i,k) = MAX(QICSIP(i,k),0._r8)
+                          ! Remove the mass of rimed cloud droplets that is
+                          !    involved in SIP
+                          PSACWS(i,k) = PSACWS(i,k) - QICSIP(i,k)
+                       end if !Mass transfer
+
+                    end if  !RIMR>0...
+
+                    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    ! FOR LOWER TEMPERATURES BETWEEN -20 AND -8 C
+                    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                 else if ((t(i,k) < 265.15_r8) .and. (t(i,k) >= 253.15_r8)) then
+
+                    ! Activation of the collisional break-up and the
+                    ! droplet shattering process in the presence of rimed
+                    ! raidrops: forestbrds
+
+                    if (RIMR(i,k) > 0._r8) then
+
+                       ! This subroutine reads the 6 inputs and gives 3
+                       ! predictions for the SIP rates due to BR (BR_RATE)
+                       ! and DS (DS_RATE), as well as the mass of raindrops
+                       ! rimed onto the ice particle that will be
+                       ! transferred to the cloud ice category (QIRSIP).
+
+                       call runforestriv(mdim6, max_nodes4, jbt,             &
+                            (/ LOG10(IWC(i,k)), LOG10(RIMC(i,k)),            &
+                            LOG10(RIMR(i,k)), LOG10(TEMPK(i,k)),             &
+                            LOG10(RHI(i,k)), LOG10(LWC(i,k)) /),             &
+                            ypred1, ypred2, ypred3, leftchild4, rightchild4, &
+                            splitfeat4, thresh4, out41, out42, out43)
+
+                       BR_RATE(i,k) = 10._r8**(ypred1)
+                       BR_RATE(i,k) = MAX(BR_RATE(i,k),0._r8)
+
+                       DS_RATE(i,k) = 10._r8**(ypred2)
+                       DS_RATE(i,k) = MAX(DS_RATE(i,k),0._r8)
+
+                       !! Mass transfer from cloud droplets/raindrops to
+                       !! cloud ice if HM_RATE>0 and RIMC,RIMR>0
+                       if (DS_RATE(i,k) > 0._r8) then
+                          QIRSIP(i,k) = 10._r8**(ypred3)
+                          ! RIMR=PRACS, only max 1% of the rimed mass can be
+                          !    used for SIP
+                          QIRSIP(i,k) = MIN(QIRSIP(i,k),0.01_r8*RIMR(i,k))
+                          QIRSIP(i,k) = MAX(QIRSIP(i,k),0._r8)
+                          ! Remove the mass of rimed raindrops that is
+                          !    involved in SIP
+                          PRACS(i,k) = PRACS(i,k) - QIRSIP(i,k)
+                       end if !Mass transfer
+
+                       ! Activation of the collisional break-up process when
+                       ! temperature is below the HM range, in the absence of
+                       ! raidrops: forestbr
+                    else
+
+                       ! This subroutine reads the 5 inputs and predicts the
+                       ! SIP rate due to BR (BR_RATE)
+                       call runforest(mdim5, max_nodes2, jbt,     &
+                            (/ LOG10(IWC(i,k)), LOG10(RIMC(i,k)), &
+                            LOG10(TEMPK(i,k)), LOG10(RHI(i,k)),   &
+                            LOG10(LWC(i,k)) /),                   &
+                            ypred1, leftchild2, rightchild2,      &
+                            splitfeat2, thresh2, out21)
+
+                       BR_RATE(i,k) = 10._r8**(ypred1)
+                       BR_RATE(i,k) = MAX(BR_RATE(i,k),0._r8)
+
+                    end if ! IF RIMR>0...
+
+                    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    ! FOR WARMER TEMPERATURES BETWEEN -3 AND 0 C
+                    !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    ! Activation of the collisional break-up process when
+                    ! temperature is warmer than -3 C, in the absence of
+                    ! raidrops: forestbr
+                 else if ((t(i,k) <= 273.15_r8) .and. (t(i,k) >= 270.15_r8)) then
+
+                    ! This subroutine reads the 5 inputs and predicts the
+                    !   SIP rate due to BR (BR_RATE)
+                    call runforest(mdim5, max_nodes5, jbt,     &
+                         (/ LOG10(IWC(i,k)), LOG10(RIMC(i,k)), &
+                         LOG10(TEMPK(i,k)), LOG10(RHI(i,k)),   &
+                         LOG10(LWC(i,k)) /), ypred1,           &
+                         leftchild5, rightchild5, splitfeat5, thresh5, out51)
+
+                    BR_RATE(i,k) = 10._r8**(ypred1)
+                    BR_RATE(i,k) = MAX(BR_RATE(i,k),0._r8)
+
+                 end if !Temperature range
+              end if !lower bounds
+
+              !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+              ! Combine the effect of all SIP processes into one SIP_RATE
+              ! that will be added in the conservation law of ice
+              ! crystals at the end of the model time-step
+              !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+              SIP_RATE(i,k) = BR_RATE(i,k)+DS_RATE(i,k)+HM_RATE(i,k)
+              SIP_RATE(i,k) = MAX(SIP_RATE(i,k),0._r8)
+              ! 10 particles /kg/s is the maximum SIP rate in the
+              ! training dataset
+              SIP_RATE(i,k) = MIN(SIP_RATE(i,k),10._r8)
+
+              if (trim(rafsip_diags) /= 'None') then
+                 ! Save SIP rates
+                 proc_rates%BR_RATE(i,k) = BR_RATE(i,k)
+                 proc_rates%DS_RATE(i,k) = DS_RATE(i,k)
+                 proc_rates%HM_RATE(i,k) = HM_RATE(i,k)
+                 proc_rates%SIP_RATE(i,k) = SIP_RATE(i,k)
+              end if
+
+           end do ! i = 1, mgcol
+        end do ! k = 1, nlev
+        !$acc end parallel
+
+     end if  ! rafsip_on
+! RaFSIP GS/PG
   end if !do_cldice
 
 ! Process rate calls for graupel
@@ -2601,10 +3027,28 @@ subroutine micro_pumas_tend ( &
         dum = ((prc(i,k)+pra(i,k)+mnuccc(i,k)+mnucct(i,k)+msacwi(i,k)+ &
              psacws(i,k)+bergs(i,k)+qmultg(i,k)+psacwg(i,k)+pgsacw(i,k))*lcldm(i,k)+ &
              berg(i,k))*deltat
+! RaFSIP GS/PG
+        if (rafsip_on) then
+           dum = dum + (QICSIP(i,k)*lcldm(i,k)*deltat)
+        end if
+! RaFSIP GS/PG
         if (dum.gt.qc(i,k)) then
+! RaFSIP GS/PG
+           ! Note: dum_2D(i,k) should (hopefully) be re-inserted below
+           !       added after berg(i,k)
+           dum_2D(i,k) = 0.0_r8
+           if (rafsip_on) then
+              dum_2D = (QICSIP(i,k)*lcldm(i,k))
+           end if
+! RaFSIP GS/PG
            ratio = qc(i,k)*rdeltat/((prc(i,k)+pra(i,k)+mnuccc(i,k)+mnucct(i,k)+ &
                 msacwi(i,k)+psacws(i,k)+bergs(i,k)+qmultg(i,k)+psacwg(i,k)+pgsacw(i,k))*lcldm(i,k)+&
-                berg(i,k))*omsm
+                berg(i,k)+dum_2D(i,k))*omsm
+! RaFSIP GS/PG
+           if (rafsip_on) then
+              QICSIP(i,k) = QICSIP(i,k) * ratio !RaFSIP
+           end if
+! RaFSIP GS/PG
            qmultg(i,k)=qmultg(i,k)*ratio
            psacwg(i,k)=psacwg(i,k)*ratio
            pgsacw(i,k)=pgsacw(i,k)*ratio
@@ -2705,15 +3149,25 @@ subroutine micro_pumas_tend ( &
      do i=1,mgncol
         ! conservation of rain mixing ratio
         !-------------------------------------------------------------------
+! RaFSIP GS/PG
+        ! Note: dum_2D(i,k) should (hopefully) be re-inserted below
+        !       after pgracs(i,k) term in dum equation, if statement,
+        !       and in ratio calculation
+        dum_2D(i,k) = 0.0_r8
+        if (rafsip_on) then
+           dum_2D(i,k) = QIRSIP(i,k)
+        end if
+! RaFSIP GS/PG
         dum = ((-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k) &
-             +qmultrg(i,k)+pracg(i,k)+pgracs(i,k))*precip_frac(i,k)- &
+             +qmultrg(i,k)+pracg(i,k)+pgracs(i,k)+dum_2D(i,k))*precip_frac(i,k)- &
              (pra(i,k)+prc(i,k))*lcldm(i,k))*deltat
         ! note that qrtend is included below because of instantaneous freezing/melt
         if (dum.gt.qr(i,k).and. &
-             (-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k)+qmultrg(i,k)+pracg(i,k)+pgracs(i,k)).ge.qsmall) then
+             (-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k)+qmultrg(i,k)+pracg(i,k)+pgracs(i,k)+dum_2D(i,k)).ge.qsmall) then
            ratio = (qr(i,k)*rdeltat+(pra(i,k)+prc(i,k))*lcldm(i,k))/   &
                 precip_frac(i,k)/(-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k) &
-                +qmultrg(i,k)+pracg(i,k)+pgracs(i,k))*omsm
+                                +qmultrg(i,k)+pracg(i,k)+pgracs(i,k)+dum_2D(i,k))*omsm
+! RaFSIP GS/PG
            qmultrg(i,k)= qmultrg(i,k)*ratio
            pracg(i,k)=pracg(i,k)*ratio
            pgracs(i,k)=pgracs(i,k)*ratio
@@ -2721,6 +3175,11 @@ subroutine micro_pumas_tend ( &
            pracs(i,k)=pracs(i,k)*ratio
            mnuccr(i,k)=mnuccr(i,k)*ratio
            mnuccri(i,k)=mnuccri(i,k)*ratio
+! RaFSIP GS/PG
+           if (rafsip_on) then
+              QIRSIP(i,k)=QIRSIP(i,k)*ratio
+           end if
+! RaFSIP GS/PG
         end if
 
         ! conservation of rain number
@@ -2766,6 +3225,11 @@ subroutine micro_pumas_tend ( &
            dum = ((-mnuccc(i,k)-mnucct(i,k)-mnudep(i,k)-msacwi(i,k)-qmultg(i,k))*lcldm(i,k)+(prci(i,k)+ &
                 prai(i,k))*icldm(i,k)+(-qmultrg(i,k)-mnuccri(i,k))*precip_frac(i,k) &
                 -ice_sublim(i,k)-vap_dep(i,k)-berg(i,k)-mnuccd(i,k))*deltat
+! RaFSIP GS/PG
+           if (rafsip_on) then
+              dum = dum - (SIP_RATE(i,k)*lcldm(i,k)*deltat)
+           end if
+! RaFSIP GS/PG
            if (dum.gt.qi(i,k)) then
               ratio = (qi(i,k)*rdeltat+vap_dep(i,k)+berg(i,k)+mnuccd(i,k)+ &
                    (mnuccc(i,k)+mnucct(i,k)+mnudep(i,k)+msacwi(i,k)+qmultg(i,k))*lcldm(i,k)+ &
@@ -2787,8 +3251,16 @@ subroutine micro_pumas_tend ( &
                 nprai(i,k)-nsubi(i,k))*icldm(i,k)+(-nmultrg(i,k)-nnuccri(i,k))*precip_frac(i,k)- &
                 nnuccd(i,k))*deltat
            if (dum.gt.ni(i,k)) then
+! RaFSIP GS/PG
+              ! Note: dum_2D(i,k) should (hopefully) be re-inserted below
+              !       after nmultg(i,k) term in ratio equation
+              dum_2D(i,k) = 0.0_r8
+              if (rafsip_on) then
+                 dum_2D(i,k) = SIP_RATE(i,k)
+              end if
+! RaFSIP GS/PG
               ratio = (ni(i,k)*rdeltat+nnuccd(i,k)+ &
-                 (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k)+nmultg(i,k))*lcldm(i,k)+ &
+                 (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k)+nmultg(i,k)+dum_2d(i,i))*lcldm(i,k)+ &
                  (nnuccri(i,k)+nmultrg(i,k))*precip_frac(i,k))/ &
                  ((nprci(i,k)+nprai(i,k)-nsubi(i,k))*icldm(i,k))*omsm
               nprci(i,k) = nprci(i,k)*ratio
@@ -2981,20 +3453,41 @@ subroutine micro_pumas_tend ( &
              qmultg(i,k)+pgsacw(i,k))*lcldm(i,k)+ &
              (mnuccr(i,k)+pracs(i,k)+mnuccri(i,k)+pracg(i,k)+pgracs(i,k)+qmultrg(i,k))*precip_frac(i,k)+ &
              berg(i,k))*xlf)
+! RaFSIP GS/PG
+        if (rafsip_on) then
+           tlat(i,k) = tlat(i,k)+((QICSIP(i,k)*lcldm(i,k)+QIRSIP(i,k)*precip_frac(i,k))*xlf)
+        end if
+! RaFSIP GS/PG
         qctend(i,k) = qctend(i,k)+ &
              (-pra(i,k)-prc(i,k)-mnuccc(i,k)-mnucct(i,k)-msacwi(i,k)- &
              psacws(i,k)-bergs(i,k)-qmultg(i,k)-psacwg(i,k)-pgsacw(i,k))*lcldm(i,k)-berg(i,k)
+! RaFSIP GS/PG
+        if (rafsip_on) then
+           qctend(i,k) = qctend(i,k)-(QICSIP(i,k)*lcldm(i,k))
+        end if
+        ! Note:  (above) must match first term in 'dum' below in PUMAS
+! RaFSIP GS/PG
 
         if (do_cldice) then
            qitend(i,k) = qitend(i,k)+ &
                 (mnuccc(i,k)+mnucct(i,k)+mnudep(i,k)+msacwi(i,k)+qmultg(i,k))*lcldm(i,k)+(-prci(i,k)- &
                 prai(i,k))*icldm(i,k)+vap_dep(i,k)+berg(i,k)+ice_sublim(i,k)+ &
                 mnuccd(i,k)+(mnuccri(i,k)+qmultrg(i,k))*precip_frac(i,k)
+! RaFSIP GS/PG
+           if (rafsip_on) then
+              qitend(i,k) = qitend(i,k)+(QIRSIP(i,k)*precip_frac(i,k))
+           end if
+! RaFSIP GS/PG
         end if
 
         qrtend(i,k) = qrtend(i,k)+ &
              (pra(i,k)+prc(i,k))*lcldm(i,k)+(pre(i,k)-pracs(i,k)- &
              mnuccr(i,k)-mnuccri(i,k)-qmultrg(i,k)-pracg(i,k)-pgracs(i,k))*precip_frac(i,k)
+! RaFSIP GS/PG
+        if (rafsip_on) then
+           qrtend(i,k) = qrtend(i,k)-(QIRSIP(i,k)*precip_frac(i,k))
+        end if
+! RaFSIP GS/PG
 
         if (do_hail.or.do_graupel) then
            qgtend(i,k) = qgtend(i,k) + (pracg(i,k)+pgracs(i,k)+prdg(i,k)+psacr(i,k)+mnuccr(i,k))*precip_frac(i,k) &
@@ -3106,6 +3599,24 @@ subroutine micro_pumas_tend ( &
   end do
   !$acc end parallel
 
+! RaFSIP GS/PG
+  if (rafsip_on) then
+     !$acc parallel vector_length(VLENS) default(present)
+     !$acc loop gang vector collapse(2)
+     do k=1,nlev
+        do i=1,mgncol
+           ! microphysics output, note this is grid-averaged
+           proc_rates%nsubctot(i,k) = nsubc(i,k)*lcldm(i,k)
+           proc_rates%nprc1tot(i,k) = nprc1(i,k)*lcldm(i,k)
+           ! Note: This is recomputing the above calculation of nsacwitot
+           proc_rates%nsacwitot(i,k) = SIP_RATE(i,k)*lcldm(i,k)
+           proc_rates%nsubitot(i,k) = nsubi(i,k)*icldm(i,k)
+        end do
+     end do
+     !$acc end parallel
+  end if
+! RaFSIP GS/PG
+
   !$acc parallel vector_length(VLENS) default(present)
   !$acc loop gang vector collapse(2)
   do k=1,nlev
@@ -3113,15 +3624,22 @@ subroutine micro_pumas_tend ( &
         nctend(i,k) = nctend(i,k)+&
            (-nnuccc(i,k)-nnucct(i,k)-npsacws(i,k)+nsubc(i,k) &
            -npra(i,k)-nprc1(i,k)-npsacwg(i,k))*lcldm(i,k)
-
         if (do_cldice) then
            if (use_hetfrz_classnuc) then
               tmpfrz = nnuccc(i,k)
            else
               tmpfrz = 0._r8
            end if
+! RaFSIP GS/PG
+           ! Note: dum2A(i,k) should (hopefully) be re-inserted below
+           !       after nmultg(i,k) term in nitend equation
+           dum2A(i,k) = 0.0_r8
+           if (rafsip_on) then
+              dum2A(i,k) = SIP_RATE(i,k)
+           end if
+! RaFSIP GS/PG
            nitend(i,k) = nitend(i,k)+ nnuccd(i,k)+ &
-                (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k)+nmultg(i,k))*lcldm(i,k)+(nsubi(i,k)-nprci(i,k)- &
+                (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k)+nmultg(i,k)+dum2A(i,k))*lcldm(i,k)+(nsubi(i,k)-nprci(i,k)- &
                 nprai(i,k))*icldm(i,k)+(nnuccri(i,k)+nmultrg(i,k))*precip_frac(i,k)
         end if
 
@@ -3877,6 +4395,12 @@ end if
               else
                  qitend(i,k)=qitend(i,k)+dum*dumr(i,k)*rdeltat
                  nitend(i,k)=nitend(i,k)+dum*dumnr(i,k)*rdeltat
+! RaFSIP GS/PG
+                 if (rafsip_on) then
+                    proc_rates%frzr(i,k)=proc_rates%frzr(i,k)+dum*dumr(i,k)*rdeltat
+                    proc_rates%nfrzr(i,k)=proc_rates%nfrzr(i,k)+dum*dumnr(i,k)*rdeltat
+                 end if
+! RaFSIP GS/PG
               end if
 
               ! heating tendency
@@ -3918,6 +4442,11 @@ end if
 
                  proc_rates%nmelttot(i,k)=3._r8*dum*dumi(i,k)*rdeltat/ &
                       (4._r8*pi*5.12e-16_r8*rhow)
+! RaFSIP GS/PG
+                 if (allocated(proc_rates%nimelttot)) then
+                    proc_rates%nimelttot(i,k)=nitend(i,k)-((1._r8-dum)*dumni(i,k)-ni(i,k))*rdeltat
+                 end if
+! RaFSIP GS/PG
                  nctend(i,k)=nctend(i,k)+proc_rates%nmelttot(i,k)
 
                  qitend(i,k)=((1._r8-dum)*dumi(i,k)-qi(i,k))*rdeltat
@@ -3958,9 +4487,34 @@ end if
            end if
 
            ! ice number limiter
-           if (do_cldice .and. nitend(i,k).gt.0._r8.and.ni(i,k)+nitend(i,k)*deltat.gt.micro_mg_max_nicons*icldm(i,k)/rho(i,k)) then
-              nitend(i,k)=max(0._r8,(micro_mg_max_nicons*icldm(i,k)/rho(i,k)-ni(i,k))/deltat)
+           !================================================================
+           ! shofer--- NorESM ice number limiter
+           if ((naai(i,k) > 0._r8) .and. (t(i,k) < icenuct) .and. &
+                (relhum(i,k)*esl(i,k)/esi(i,k) > 1.05_r8)) then
+              nimax = naai(i,k)*icldm(i,k)
+           else
+              nimax = 0.0_r8
            end if
+! RaFSIP GS/PG
+           ! Note: dum2A(i,k) should (hopefully) be re-inserted below after changes
+           !       in quantity tested for >0
+           !       in sum of terms for nimax calculation
+           dum2A(i,k) = 0.0_r8
+           if (rafsip_on) then
+              dum2A(i,k) = SIP_RATE(i,k)
+           end if
+! RaFSIP GS/PG
+           if (nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k) > 0._r8) then
+              nimax = nimax+(nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k))*lcldm(i,k)*deltat
+           end if
+           if (do_cldice .and. (nitend(i,k) > 0._r8) .and.                    &
+                (ni(i,k) + (nitend(i,k)*deltat) > nimax)) then
+              if (allocated(proc_rates%nitncons)) then
+                 proc_rates%nitncons(i,k) = proc_rates%nitncons(i,k) + nitend(i,k) - max(0._r8,(nimax-ni(i,k))/deltat)
+              end if
+              nitend(i,k)=max(0._r8,(nimax-ni(i,k))/deltat)
+           end if
+           !shofer--- NorESM ice number limiter
 
      ! remove any excess over-saturation, which is possible due to non-linearity when adding
      ! together all microphysical processes
@@ -4093,6 +4647,13 @@ end if
            if (dumi(i,k).ge.qsmall) then
               if (dumni(i,k) /=dum_2D(i,k)) then
                  ! adjust number conc if needed to keep mean size in reasonable range
+! RaFSIP GS/PG
+                 if (rafsip_on .and. dumni(i,k)<dum_2D(i,k)) then
+                    proc_rates%nitnszmx(i,k)=proc_rates%nitnszmx(i,k) + nitend(i,k)-(dumni(i,k)*icldm(i,k)-ni(i,k))*rdeltat
+                 else if (rafsip_on) then
+                    proc_rates%nitnszmn(i,k)=proc_rates%nitnszmn(i,k) + nitend(i,k)-(dumni(i,k)*icldm(i,k)-ni(i,k))*rdeltat
+                 end if
+! RaFSIP GS/PG
                  nitend(i,k)=(dumni(i,k)*icldm(i,k)-ni(i,k))*rdeltat
               end if
               effi(i,k)   = 1.5_r8/lami(i,k)*1.e6_r8
@@ -4156,6 +4717,13 @@ end if
            end if
            if (dum_2D(i,k) /= dumnc(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
+! RaFSIP GS/PG
+              if ((dumnc(i,k) < dum_2D(i,k)) .and. allocated(proc_rates%nctnszmx)) then
+                 proc_rates%nctnszmx(i,k)=proc_rates%nctnszmx(i,k) + nctend(i,k)-(dumnc(i,k)*lcldm(i,k)-nc(i,k))*rdeltat
+              else if (allocated(proc_rates%nctnszmn)) then
+                 proc_rates%nctnszmn(i,k)=proc_rates%nctnszmn(i,k) + nctend(i,k)-(dumnc(i,k)*lcldm(i,k)-nc(i,k))*rdeltat
+              endif
+! RaFSIP GS/PG
               nctend(i,k)=(dumnc(i,k)*lcldm(i,k)-nc(i,k))*rdeltat
            end if
 
@@ -4170,6 +4738,11 @@ end if
            ! assume constant number of 10^8 kg-1
            dumnc(i,k)=1.e8_r8
         end if
+! RaFSIP GS/PG
+        if (allocated(proc_rates%npccntot)) then
+           proc_rates%npccntot(i,k) = npccn(i,k)
+        end if
+! RaFSIP GS/PG
      end do
   end do
   !$acc end parallel
@@ -4263,8 +4836,22 @@ end if
 
         ! if updated q (after microphysics) is zero, then ensure updated n is also zero
         !=================================================================================
-        if (qc(i,k)+qctend(i,k)*deltat.lt.qsmall) nctend(i,k)=-nc(i,k)*rdeltat
-        if (do_cldice .and. qi(i,k)+qitend(i,k)*deltat.lt.qsmall) nitend(i,k)=-ni(i,k)*rdeltat
+        if (qc(i,k)+qctend(i,k)*deltat.lt.qsmall) then
+! RaFSIP GS/PG
+           if (allocated(proc_rates%nctnncld)) then
+              proc_rates%nctnncld(i,k) = proc_rates%nctnncld(i,k) + nctend(i,k) +nc(i,k)*rdeltat
+           end if
+! RaFSIP GS/PG
+           nctend(i,k)=-nc(i,k)*rdeltat
+        end if
+        if (do_cldice .and. qi(i,k)+qitend(i,k)*deltat.lt.qsmall) then
+! RaFSIP GS/PG
+           if (allocated(proc_rates%nitnncld)) then
+              proc_rates%nitnncld(i,k) = proc_rates%nitnncld(i,k) + nitend(i,k) +ni(i,k)*rdeltat
+           end if
+! RaFSIP GS/PG
+           nitend(i,k)=-ni(i,k)*rdeltat
+        end if
         if (qr(i,k)+qrtend(i,k)*deltat.lt.qsmall) nrtend(i,k)=-nr(i,k)*rdeltat
         if (qs(i,k)+qstend(i,k)*deltat.lt.qsmall) nstend(i,k)=-ns(i,k)*rdeltat
         if (qg(i,k)+qgtend(i,k)*deltat.lt.qsmall) ngtend(i,k)=-ng(i,k)*rdeltat
