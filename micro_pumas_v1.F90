@@ -3641,6 +3641,37 @@ subroutine micro_pumas_tend (                                            &
            nitend(i,k) = nitend(i,k)+ nnuccd(i,k)+ &
                 (nnucct(i,k)+tmpfrz+nnudep(i,k)+nsacwi(i,k)+nmultg(i,k)+dum2A(i,k))*lcldm(i,k)+(nsubi(i,k)-nprci(i,k)- &
                 nprai(i,k))*icldm(i,k)+(nnuccri(i,k)+nmultrg(i,k))*precip_frac(i,k)
+
+           ! ice number limiter
+           !================================================================
+           ! NorESM local ice number limiter. As in NorESM2 /CESM2 but included 
+           if ((naai(i,k) > 0._r8) .and. (t(i,k) < icenuct) .and. &
+                (relhum(i,k)*esl(i,k)/esi(i,k) > 1.05_r8)) then
+              nimax = naai(i,k)*icldm(i,k)*deltat
+           else
+              nimax = 0.0_r8
+           end if
+! RaFSIP GS/PG
+           ! Note: dum2A(i,k) should (hopefully) be re-inserted below after changes
+           !       in quantity tested for >0
+           !       in sum of terms for nimax calculation
+           dum2A(i,k) = 0.0_r8
+           if (rafsip_on) then
+              dum2A(i,k) = SIP_RATE(i,k)
+           end if
+! RaFSIP GS/PG
+           if (nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k) > 0._r8) then
+              nimax = nimax+(nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k))*lcldm(i,k)*deltat
+           end if
+           if (do_cldice .and. (nitend(i,k) > 0._r8) .and.                    &
+                (ni(i,k) + (nitend(i,k)*deltat) > nimax)) then
+              if (allocated(proc_rates%nitncons)) then
+                 proc_rates%nitncons(i,k) = proc_rates%nitncons(i,k) + nitend(i,k) - max(0._r8,(nimax-ni(i,k))/deltat)
+              end if
+              nitend(i,k)=max(0._r8,(nimax-ni(i,k))/deltat)
+           end if
+
+           
         end if
 
         if(do_graupel.or.do_hail) then
@@ -4486,35 +4517,11 @@ end if
               end if
            end if
 
-           ! ice number limiter
-           !================================================================
-           ! shofer--- NorESM ice number limiter
-           if ((naai(i,k) > 0._r8) .and. (t(i,k) < icenuct) .and. &
-                (relhum(i,k)*esl(i,k)/esi(i,k) > 1.05_r8)) then
-              nimax = naai(i,k)*icldm(i,k)
-           else
-              nimax = 0.0_r8
+          ! ice number limiter
+           if (do_cldice .and. nitend(i,k).gt.0._r8.and.ni(i,k)+nitend(i,k)*deltat.gt.micro_mg_max_nicons*icldm(i,k)/rho(i,k)) then
+              nitend(i,k)=max(0._r8,(micro_mg_max_nicons*icldm(i,k)/rho(i,k)-ni(i,k))/deltat)
            end if
-! RaFSIP GS/PG
-           ! Note: dum2A(i,k) should (hopefully) be re-inserted below after changes
-           !       in quantity tested for >0
-           !       in sum of terms for nimax calculation
-           dum2A(i,k) = 0.0_r8
-           if (rafsip_on) then
-              dum2A(i,k) = SIP_RATE(i,k)
-           end if
-! RaFSIP GS/PG
-           if (nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k) > 0._r8) then
-              nimax = nimax+(nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k))*lcldm(i,k)*deltat
-           end if
-           if (do_cldice .and. (nitend(i,k) > 0._r8) .and.                    &
-                (ni(i,k) + (nitend(i,k)*deltat) > nimax)) then
-              if (allocated(proc_rates%nitncons)) then
-                 proc_rates%nitncons(i,k) = proc_rates%nitncons(i,k) + nitend(i,k) - max(0._r8,(nimax-ni(i,k))/deltat)
-              end if
-              nitend(i,k)=max(0._r8,(nimax-ni(i,k))/deltat)
-           end if
-           !shofer--- NorESM ice number limiter
+
 
      ! remove any excess over-saturation, which is possible due to non-linearity when adding
      ! together all microphysical processes
