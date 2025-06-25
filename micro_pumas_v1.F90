@@ -204,6 +204,9 @@ logical :: precip_fall_corr
 
 !--ag
 
+! Use Shofer local ice number limiter
+logical :: shofer_ice_limiter
+
 !=========================================================
 ! Private module parameters
 !=========================================================
@@ -313,6 +316,7 @@ logical           :: accre_sees_auto  != .true.
 !$acc                 nrnst,nsnst,evap_sed_off,icenuc_rh_off,evap_scl_ifs,     &
 !$acc                 icenuc_use_meyers,evap_rhthrsh_ifs,rainfreeze_ifs,       &
 !$acc                 ifs_sed,precip_fall_corr,dcs,                            &
+!$acc                 shofer_ice_limiter,                                      &
 !$acc                 g,r,rv,cpp,tmelt,xxlv,xlf,xxls,rhmini,microp_uniform,    &
 !$acc                 do_cldice,use_hetfrz_classnuc,do_hail,do_graupel,rhosu,  &
 !$acc                 icenuct,snowmelt,rainfrze,xxlv_squared,xxls_squared,     &
@@ -347,6 +351,7 @@ subroutine micro_pumas_init( &
      micro_mg_evap_sed_off_in, micro_mg_icenuc_rh_off_in, micro_mg_icenuc_use_meyers_in, &
      micro_mg_evap_scl_ifs_in, micro_mg_evap_rhthrsh_ifs_in, &
      micro_mg_rainfreeze_ifs_in,  micro_mg_ifs_sed_in, micro_mg_precip_fall_corr, &
+     micro_mg_shofer_ice_limiter, &
      micro_mg_accre_sees_auto_in, micro_mg_implicit_fall_in, &
      nccons_in, nicons_in, ncnst_in, ninst_in, ngcons_in, ngnst_in, &
      nrcons_in, nrnst_in, nscons_in, nsnst_in, &
@@ -420,6 +425,7 @@ subroutine micro_pumas_init( &
   logical, intent(in) :: micro_mg_rainfreeze_ifs_in ! Rain freezing temp following ifs
   logical, intent(in) :: micro_mg_ifs_sed_in ! snow sedimentation = 1m/s following ifs
   logical, intent(in) :: micro_mg_precip_fall_corr ! ensure rain fall speed non-zero if rain above in column
+  logical, intent(in) :: micro_mg_shofer_ice_limiter ! Use shofer local ice limiter
 
   logical, intent(in) :: micro_mg_accre_sees_auto_in ! autoconverted rain is passed to accretion
 
@@ -516,6 +522,7 @@ subroutine micro_pumas_init( &
   rainfreeze_ifs = micro_mg_rainfreeze_ifs_in
   ifs_sed = micro_mg_ifs_sed_in
   precip_fall_corr = micro_mg_precip_fall_corr
+  shofer_ice_limiter = micro_mg_shofer_ice_limiter
   ! typical air density at 850 mb
 
   rhosu = 85000._r8/(rair * tmelt)
@@ -560,6 +567,7 @@ subroutine micro_pumas_init( &
   !$acc                nrnst,nsnst,evap_sed_off,icenuc_rh_off,evap_scl_ifs,    &
   !$acc                icenuc_use_meyers,evap_rhthrsh_ifs,rainfreeze_ifs,      &
   !$acc                ifs_sed,precip_fall_corr,dcs,                           &
+  !$acc                shofer_ice_limiter,                                     &
   !$acc                g,r,rv,cpp,tmelt,xxlv,xlf,xxls,rhmini,microp_uniform,   &
   !$acc                do_cldice,use_hetfrz_classnuc,do_hail,do_graupel,rhosu, &
   !$acc                icenuct,snowmelt,rainfrze,xxlv_squared,xxls_squared,    &
@@ -3644,34 +3652,34 @@ subroutine micro_pumas_tend (                                            &
 
            ! ice number limiter
            !================================================================
-           ! NorESM local ice number limiter. As in NorESM2 /CESM2 but included 
-           if ((naai(i,k) > 0._r8) .and. (t(i,k) < icenuct) .and. &
-                (relhum(i,k)*esl(i,k)/esi(i,k) > 1.05_r8)) then
-              nimax = naai(i,k)*icldm(i,k)*deltat
-           else
-              nimax = 0.0_r8
-           end if
-! RaFSIP GS/PG
-           ! Note: dum2A(i,k) should (hopefully) be re-inserted below after changes
-           !       in quantity tested for >0
-           !       in sum of terms for nimax calculation
-           dum2A(i,k) = 0.0_r8
-           if (rafsip_on) then
-              dum2A(i,k) = SIP_RATE(i,k)
-           end if
-! RaFSIP GS/PG
-           if (nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k) > 0._r8) then
-              nimax = nimax+(nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k))*lcldm(i,k)*deltat
-           end if
-           if (do_cldice .and. (nitend(i,k) > 0._r8) .and.                    &
-                (ni(i,k) + (nitend(i,k)*deltat) > nimax)) then
-              if (allocated(proc_rates%nitncons)) then
-                 proc_rates%nitncons(i,k) = proc_rates%nitncons(i,k) + nitend(i,k) - max(0._r8,(nimax-ni(i,k))/deltat)
+           if (shofer_ice_limiter) then
+              ! NorESM local ice number limiter. As in NorESM2 / CESM2
+              if ((naai(i,k) > 0._r8) .and. (t(i,k) < icenuct) .and. &
+                   (relhum(i,k)*esl(i,k)/esi(i,k) > 1.05_r8)) then
+                 nimax = naai(i,k)*icldm(i,k)*deltat
+              else
+                 nimax = 0.0_r8
               end if
-              nitend(i,k)=max(0._r8,(nimax-ni(i,k))/deltat)
+! RaFSIP GS/PG
+              ! Note: dum2A(i,k) should (hopefully) be re-inserted below after changes
+              !       in quantity tested for >0
+              !       in sum of terms for nimax calculation
+              dum2A(i,k) = 0.0_r8
+              if (rafsip_on) then
+                 dum2A(i,k) = SIP_RATE(i,k)
+              end if
+! RaFSIP GS/PG
+              if (nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k) > 0._r8) then
+                 nimax = nimax+(nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k))*lcldm(i,k)*deltat
+              end if
+              if ((nitend(i,k) > 0._r8) .and.                          &
+                   (ni(i,k) + (nitend(i,k)*deltat) > nimax)) then
+                 if (allocated(proc_rates%nitncons)) then
+                    proc_rates%nitncons(i,k) = proc_rates%nitncons(i,k) + nitend(i,k) - max(0._r8,(nimax-ni(i,k))/deltat)
+                 end if
+                 nitend(i,k)=max(0._r8,(nimax-ni(i,k))/deltat)
+              end if
            end if
-
-           
         end if
 
         if(do_graupel.or.do_hail) then
@@ -4517,7 +4525,7 @@ end if
               end if
            end if
 
-          ! ice number limiter
+          ! global ice number limiter
            if (do_cldice .and. nitend(i,k).gt.0._r8.and.ni(i,k)+nitend(i,k)*deltat.gt.micro_mg_max_nicons*icldm(i,k)/rho(i,k)) then
               nitend(i,k)=max(0._r8,(micro_mg_max_nicons*icldm(i,k)/rho(i,k)-ni(i,k))/deltat)
            end if
