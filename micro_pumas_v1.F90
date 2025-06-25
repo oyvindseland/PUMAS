@@ -3663,7 +3663,7 @@ subroutine micro_pumas_tend (                                            &
            if (nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k) > 0._r8) then
               nimax = nimax+(nnucct(i,k)+nnuccc(i,k)+nnudep(i,k)+dum2A(i,k))*lcldm(i,k)*deltat
            end if
-           if (do_cldice .and. (nitend(i,k) > 0._r8) .and.                    &
+           if ((nitend(i,k) > 0._r8) .and.                    &
                 (ni(i,k) + (nitend(i,k)*deltat) > nimax)) then
               if (allocated(proc_rates%nitncons)) then
                  proc_rates%nitncons(i,k) = proc_rates%nitncons(i,k) + nitend(i,k) - max(0._r8,(nimax-ni(i,k))/deltat)
