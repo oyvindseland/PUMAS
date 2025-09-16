@@ -3475,7 +3475,8 @@ subroutine micro_pumas_tend (                                            &
                 mnuccd(i,k)+(mnuccri(i,k)+qmultrg(i,k))*precip_frac(i,k)
 ! RaFSIP GS/PG
            if (rafsip_on) then
-              qitend(i,k) = qitend(i,k)+(QIRSIP(i,k)*precip_frac(i,k))
+              qitend(i,k) = qitend(i,k)+ &
+                   (QIRSIP(i,k)*precip_frac(i,k)) + (QICSIP(i,k)*lcldm(i,k))
            end if
 ! RaFSIP GS/PG
         end if
@@ -3644,7 +3645,7 @@ subroutine micro_pumas_tend (                                            &
 
            ! ice number limiter
            !================================================================
-           ! NorESM local ice number limiter. As in NorESM2 /CESM2 but included 
+           ! NorESM local ice number limiter. As in NorESM2 /CESM2 but included
            if ((naai(i,k) > 0._r8) .and. (t(i,k) < icenuct) .and. &
                 (relhum(i,k)*esl(i,k)/esi(i,k) > 1.05_r8)) then
               nimax = naai(i,k)*icldm(i,k)*deltat
@@ -3671,7 +3672,7 @@ subroutine micro_pumas_tend (                                            &
               nitend(i,k)=max(0._r8,(nimax-ni(i,k))/deltat)
            end if
 
-           
+
         end if
 
         if(do_graupel.or.do_hail) then
