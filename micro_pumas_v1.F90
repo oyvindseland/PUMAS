@@ -3225,11 +3225,7 @@ subroutine micro_pumas_tend (                                            &
            dum = ((-mnuccc(i,k)-mnucct(i,k)-mnudep(i,k)-msacwi(i,k)-qmultg(i,k))*lcldm(i,k)+(prci(i,k)+ &
                 prai(i,k))*icldm(i,k)+(-qmultrg(i,k)-mnuccri(i,k))*precip_frac(i,k) &
                 -ice_sublim(i,k)-vap_dep(i,k)-berg(i,k)-mnuccd(i,k))*deltat
-! RaFSIP GS/PG
-           if (rafsip_on) then
-              dum = dum - (SIP_RATE(i,k)*lcldm(i,k)*deltat)
-           end if
-! RaFSIP GS/PG
+
            if (dum.gt.qi(i,k)) then
               ratio = (qi(i,k)*rdeltat+vap_dep(i,k)+berg(i,k)+mnuccd(i,k)+ &
                    (mnuccc(i,k)+mnucct(i,k)+mnudep(i,k)+msacwi(i,k)+qmultg(i,k))*lcldm(i,k)+ &
@@ -3250,6 +3246,11 @@ subroutine micro_pumas_tend (                                            &
            dum = ((-nnucct(i,k)-tmpfrz-nnudep(i,k)-nsacwi(i,k)-nmultg(i,k))*lcldm(i,k)+(nprci(i,k)+ &
                 nprai(i,k)-nsubi(i,k))*icldm(i,k)+(-nmultrg(i,k)-nnuccri(i,k))*precip_frac(i,k)- &
                 nnuccd(i,k))*deltat
+           ! RaFSIP GS/PG
+           if (rafsip_on) then
+              dum = dum - (SIP_RATE(i,k)*lcldm(i,k)*deltat)
+           end if
+! RaFSIP GS/PG
            if (dum.gt.ni(i,k)) then
 ! RaFSIP GS/PG
               ! Note: dum_2D(i,k) should (hopefully) be re-inserted below
